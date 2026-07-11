@@ -1,0 +1,7 @@
+{
+  "name": "smart-dispatch",
+  "version": "0.1.0",
+  "description": "Quality-first automatic model routing for Claude Code sub-agents. Default opus, downgrade only on confident trivial/routine tasks.",
+  "license": "MIT",
+  "keywords": ["claude-code", "model-routing", "sub-agent", "skill", "cost"]
+}

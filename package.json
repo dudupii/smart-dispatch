@@ -1,0 +1,11 @@
+{
+  "name": "smart-dispatch",
+  "version": "0.1.0",
+  "description": "Quality-first automatic model routing for Claude Code sub-agents.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "eval": "node eval/run-eval.js"
+  },
+  "license": "MIT"
+}

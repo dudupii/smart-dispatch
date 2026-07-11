@@ -53,3 +53,19 @@ test('budget ok keeps opus', () => {
     'opus'
   )
 })
+
+// Confidence must be a valid non-negative number; anything else is treated
+// as "not confident" so we never downgrade on garbage input.
+test('NaN confidence → opus (treated as not confident)', () => {
+  assert.equal(decideModel({ tier: 'Trivial', confidence: NaN }).model, 'opus')
+})
+test('negative confidence → opus (treated as not confident)', () => {
+  assert.equal(decideModel({ tier: 'Trivial', confidence: -0.5 }).model, 'opus')
+})
+
+// Budget mode never escalates a confident downgrade back up — it only steps
+// opus DOWN. A confident haiku/sonnet choice survives a low budget.
+test('confident downgrade survives low budget (no escalation)', () => {
+  // Trivial + confident → haiku; low budget must NOT escalate it back up.
+  assert.equal(decideModel({ tier: 'Trivial', confidence: 0.9, budgetRemaining: 0.01 }).model, 'haiku')
+})

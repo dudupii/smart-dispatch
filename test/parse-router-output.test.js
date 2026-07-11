@@ -32,3 +32,12 @@ test('no JSON at all → null', () => {
 test('non-string input → null', () => {
   assert.equal(parseRouterOutput(123), null)
 })
+test('two JSON-looking blocks → returns the valid complete one, skips incomplete', () => {
+  const r = parseRouterOutput('Schema: {"tier":"Trivial"} Answer: {"tier":"Hard","model":"opus","confidence":0.9,"reason":"design"}')
+  assert.equal(r.tier, 'Hard')
+  assert.equal(r.model, 'opus')
+})
+test('first candidate invalid, second valid → returns second', () => {
+  const r = parseRouterOutput('noise {"tier":"Easy"} then {"tier":"Routine","model":"sonnet","confidence":0.82}')
+  assert.equal(r.tier, 'Routine')
+})

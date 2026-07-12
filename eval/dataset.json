@@ -9,6 +9,11 @@
   {"task": "List the files modified in the last commit.", "expectedTier": "Trivial"},
   {"task": "Show the git log for the last 5 commits.", "expectedTier": "Trivial"},
   {"task": "Which files contain the word 'deprecated'?", "expectedTier": "Trivial"},
+  {"task": "Find where the DATABASE_URL environment variable is read.", "expectedTier": "Trivial"},
+  {"task": "List all exported functions in utils.js.", "expectedTier": "Trivial"},
+  {"task": "What version of React is declared in package.json?", "expectedTier": "Trivial"},
+  {"task": "Show the diff of the most recent commit.", "expectedTier": "Trivial"},
+  {"task": "Count the number of test files in the test directory.", "expectedTier": "Trivial"},
 
   {"task": "Reformat this function to match the project's Prettier config.", "expectedTier": "Routine"},
   {"task": "Summarize what auth.js does in two sentences.", "expectedTier": "Routine"},
@@ -20,6 +25,11 @@
   {"task": "Extract these repeated strings into a constants file.", "expectedTier": "Routine"},
   {"task": "Wrap this callback-style function in a Promise.", "expectedTier": "Routine"},
   {"task": "Sort the imports in this file alphabetically.", "expectedTier": "Routine"},
+  {"task": "Add a 'createdAt' timestamp field to this User type definition.", "expectedTier": "Routine"},
+  {"task": "Convert this array of objects into a markdown table.", "expectedTier": "Routine"},
+  {"task": "Add an email-validation regex to the validators file.", "expectedTier": "Routine"},
+  {"task": "Change the log level from 'debug' to 'info' in the server config.", "expectedTier": "Routine"},
+  {"task": "Extract the hardcoded API URL into an environment variable.", "expectedTier": "Routine"},
 
   {"task": "Design the schema for a multi-tenant billing database.", "expectedTier": "Hard"},
   {"task": "Debug a race condition in our websocket reconnect logic.", "expectedTier": "Hard"},
@@ -36,5 +46,9 @@
   {"task": "Review whether our auth design has security holes.", "expectedTier": "Hard"},
   {"task": "Implement backpressure for our streaming pipeline.", "expectedTier": "Hard"},
   {"task": "Design a retry policy that handles partial failures across services.", "expectedTier": "Hard"},
-  {"task": "Refactor the state management to avoid the prop-drilling problem.", "expectedTier": "Hard"}
+  {"task": "Refactor the state management to avoid the prop-drilling problem.", "expectedTier": "Hard"},
+  {"task": "Design an idempotent webhook delivery system that retries on failure.", "expectedTier": "Hard"},
+  {"task": "Diagnose why two replicas of the service occasionally produce different results.", "expectedTier": "Hard"},
+  {"task": "Refactor the permission system to support hierarchical roles and inheritance.", "expectedTier": "Hard"},
+  {"task": "Design a way to keep a search index in sync with the database with minimal latency.", "expectedTier": "Hard"}
 ]

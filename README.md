@@ -32,9 +32,10 @@ The skill activates automatically whenever a sub-agent is about to be dispatched
 
 ## Tuning knobs
 
-Both live in `src/decide-model.js` (the single source of truth; `skills/smart-dispatch/SKILL.md` mirrors them in prose):
+These live in `src/decide-model.js` (the single source of truth; `skills/smart-dispatch/SKILL.md` mirrors them in prose):
 
 - **`DOWNGRADE_THRESHOLD`** (default `0.8`) — the confidence required to leave opus. Raise for more conservative routing (closer to all-opus); lower to downgrade more aggressively.
+- **`BUDGET_FLOOR`** (default `0.1`) — only relevant to budget mode (the deferred Workflow "pro mode"): when remaining budget drops below this fraction, opus steps down to sonnet. Never escalates an already-downgraded task.
 - **Router model** — default Haiku (configured in `eval/run-eval.js`). If eval shows false-downgrades, raise to Sonnet.
 
 ## Validate

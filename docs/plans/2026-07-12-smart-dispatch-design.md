@@ -1,132 +1,142 @@
-# smart-dispatch — 质量优先的自动模型路由器
+# smart-dispatch — Quality-First Automatic Model Router
 
-- **日期:** 2026-07-12
-- **状态:** 设计已批准（设计阶段，待出实现计划）
-- **类型:** 开源 Claude Code 插件
+- **Date:** 2026-07-12
+- **Status:** Design approved (design phase; implementation plan follows)
+- **Type:** Open-source Claude Code plugin
+- **中文版 (Chinese):** [`2026-07-12-smart-dispatch-design.zh.md`](./2026-07-12-smart-dispatch-design.zh.md)
 
 ---
 
-## 1. 一句话定位
+## 1. One-line positioning
 
-> **每个 sub-agent 任务都用对的模型——默认最强，只在确信琐碎时降级。**
+> **Every sub-agent task gets the right model — strongest by default, downgrade only when confidently trivial.**
 
-一个开源的 Claude Code 插件，在派生 sub-agent 前自动选择模型。区别于市面上的「省钱路由器」，本工具的承诺是：**永远不会因为选错模型而掉质量**。
+An open-source Claude Code plugin that automatically selects the model before dispatching a sub-agent. Unlike the "cost-saving routers" on the market, this tool's promise is: **it never loses quality to a routing mistake.**
 
-营销卖点：「质量拉满，顺手省钱」。
+Marketing pitch: *"Max quality, save money along the way."*
 
-## 2. 背景
+## 2. Background
 
-在 Claude Code 中，**模型在 agent 被 spawn 的那一刻确定，运行过程中不能切换**。所谓「自动选模型」，本质是回答两件事：决策逻辑放在哪、由什么触发。
+In Claude Code, **the model is fixed at the moment an agent is spawned — it cannot be switched mid-run.** So "automatic model selection" really comes down to two questions: where does the decision logic live, and what triggers it.
 
-手工为每个任务指定模型既繁琐又容易出错（简单任务误用 opus 浪费、困难任务误用 haiku 掉质量）。本工具用一个便宜的「路由器」agent 在派生前做一次分类，自动决定执行 agent 用哪个模型。
+Manually picking a model per task is tedious and error-prone (trivial tasks wasted on opus; hard tasks degraded on haiku). This tool uses a cheap "router" agent to classify the task once before dispatch, then automatically decides which model the execution agent should use.
 
-## 3. 关键设计决策（溯源）
+## 3. Key design decisions
 
-在 brainstorming 过程中做出的三个核心选择：
+Three core choices made during brainstorming:
 
-| 决策点 | 选择 | 理由 |
-|--------|------|------|
-| **模式** | 路由模式（便宜模型分类 → 大模型执行） | 用结构化决策把「选模型」从模糊判断变成可靠数据 |
-| **载体** | Skill（开源主载体）+ 可选 Workflow | 开源分发：Skill 零依赖、透明可改、装上即生效；透明度=信任 |
-| **定位** | 质量优先（默认 opus，确信琐碎才降级） | 反转省钱逻辑：误判只允许「把简单当难」，绝不允许「把难当简单」 |
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Pattern** | Router pattern (cheap model classifies → strong model executes) | Turns "pick a model" from fuzzy judgment into reliable structured data |
+| **Vehicle** | Skill (OSS primary vehicle) + optional Workflow | OSS distribution: a Skill is zero-dependency, transparent, editable, and works the moment it's installed; transparency = trust |
+| **Positioning** | Quality-first (default opus, downgrade only when confidently trivial) | Inverts the cost-saving logic: the only acceptable misjudgment is treating a simple task as hard (a little wasted spend) — never the reverse |
 
-## 4. 架构与数据流
+## 4. Architecture & data flow
 
 ```
-任务进来
+Task arrives
    │
    ▼
-┌─────────────────────────────┐
-│ 路由器 (haiku，每次派生都跑)  │
-│ 输入：任务 prompt            │
-│ 输出：{ tier, model,          │
-│        confidence, reason }   │
-└─────────────────────────────┘
+┌──────────────────────────────────┐
+│ Router (haiku, runs per dispatch) │
+│ Input: task prompt                │
+│ Output: { tier, model,            │
+│          confidence, reason }     │
+└──────────────────────────────────┘
    │
-   ├──► confidence ≥ 0.8 且 tier ∈ {Trivial, Routine}
-   │    → 按建议降级执行（haiku / sonnet）
+   ├──► confidence ≥ 0.8 AND tier ∈ {Trivial, Routine}
+   │    → execute downgraded (haiku / sonnet)
    │
-   └──► 否则 / 拿不准 / 路由出错
-        → opus 兜底执行
+   └──► otherwise / unsure / router error
+        → execute on opus (fallback)
 ```
 
-**核心原则：拿不准就往上走。**
+**Core principle: when in doubt, go up.** The only acceptable misjudgment is treating a simple task as hard (a little wasted spend) — never treating a hard task as simple (lost quality).
 
-## 5. 路由分类法
+## 5. Routing taxonomy
 
-| Tier | 信号特征 | 模型 |
-|------|---------|------|
-| **Trivial** 琐碎 | 纯搜索 / grep / 读配置 / 列文件 / 查字符串 | haiku |
-| **Routine** 常规 | 清晰模式的编辑 / 总结已知内容 / 格式化 / 套模板 | sonnet |
-| **Hard** 困难 | 推理 / 设计 / 调试 / 多文件逻辑 / 写新代码 / 架构 | opus |
-| **不确定** | 任何模糊、信息不足、路由器没把握 | opus（兜底） |
+| Tier | Signal | Model |
+|------|--------|-------|
+| **Trivial** | pure search / grep / read config / list files / string lookup | haiku |
+| **Routine** | clear-pattern edit / summarize known content / format / apply a template | sonnet |
+| **Hard** | reasoning / design / debug / multi-file logic / new code / architecture | opus |
+| **Uncertain** | anything fuzzy, insufficient info, router unsure | opus (fallback) |
 
-**降级门槛：** 只有 `confidence ≥ 0.8` 且 tier 是 Trivial/Routine 才允许降级，其余一律 opus。
+**Downgrade threshold:** downgrade only when `confidence ≥ 0.8` **and** tier is Trivial or Routine; otherwise always opus.
 
-## 6. SKILL.md 设计
+## 6. SKILL.md design
+
+The shipped skill (`skills/smart-dispatch/SKILL.md`) instructs the agent to pick a model before dispatching a sub-agent. Its shape:
 
 ```markdown
 ---
 name: smart-dispatch
-description: 派生 sub-agent 前自动选模型。先用 haiku 分类任务难度，
-  再按"质量优先"选模型——默认 opus，只在确信琐碎时降级。
-  当你即将调用 Agent 工具派生任务时触发。
+description: Quality-first automatic model routing. Before dispatching a sub-agent,
+  classify the task with a cheap model and pick opus by default — downgrade only
+  when confidently trivial/routine. Trigger when about to call the Agent/Task tool.
 ---
 
-## 触发
-你即将调用 Agent/Task 工具派生 sub-agent 时。
+## Policy (source of truth: src/decide-model.js)
+- Default: opus. Quality first.
+- Downgrade ONLY when tier ∈ {Trivial, Routine} AND confidence ≥ 0.8.
+- Everything else → opus (including any uncertainty or parse failure).
+- User override wins.
+- Budget mode (Workflow pro mode only): remaining budget < 0.1 → opus may step to sonnet.
 
-## 步骤
-1. 路由：用 model:haiku 的 agent 分类任务，要求结构化输出
-   { tier, model, confidence, reason }
-2. 决策：
-   - confidence ≥ 0.8 且 tier ∈ {Trivial, Routine} → 用建议 model
-   - 否则 → opus
-3. 执行：用最终 model 派生真正的执行 agent
+## Steps
+1. If the user named a model → use it. Stop.
+2. Route with a haiku classifier → {tier, model, confidence, reason}.
+3. Apply the policy to tier + confidence (ignore the router's suggested model).
+   Parse failure → opus.
+4. Dispatch the worker with the chosen model.
 
-## 兜底
-路由失败 / 输出无法解析 → opus（绝不因路由出错掉质量）
+## Fallback
+Any error, ambiguity, or low confidence → opus. Never lose quality to a routing mistake.
 ```
 
-## 7. 边界情况
+The prose policy is a mirror of the tested function `src/decide-model.js`, which is the single source of truth.
 
-| 情况 | 处理 |
-|------|------|
-| 任务本身模糊（如「修一下那个 bug」无细节） | opus（需要推理才能搞清要干啥） |
-| 路由器自身报错 | opus |
-| **用户显式指定了模型** | 尊重用户，跳过路由 |
-| Workflow 专业模式 + 预算耗尽 | 唯一允许把 opus 向下调的触发条件 |
+## 7. Edge cases
 
-## 8. 打包结构
+| Case | Handling |
+|------|----------|
+| Task itself is fuzzy (e.g. "fix that bug" with no detail) | opus (needs reasoning just to figure out what to do) |
+| Router itself errors | opus |
+| **User explicitly named a model** | Respect the user, skip routing |
+| Workflow pro mode + budget exhausted | the only allowed downward override of opus |
+
+## 8. Packaging structure
 
 ```
 smart-dispatch-plugin/
 ├── plugin.json
 ├── skills/
 │   └── smart-dispatch/
-│       └── SKILL.md          ← 核心，装上即生效
+│       └── SKILL.md          ← core; works on install
 ├── workflows/
-│   └── batch-route.js        ← 可选专业模式（budget 自适应）
+│   └── batch-route.js        ← optional pro mode (budget-adaptive)
 └── docs/plans/
     └── 2026-07-12-smart-dispatch-design.md
 ```
 
-安装：`claude plugin add <repo>`
+Install: `claude plugin add <repo>`
 
-## 9. 验证方法
+## 9. Validation method
 
-建标注集：~50 个任务，每个标「期望模型」。跑路由器，盯两个指标：
+Build a labeled set (~50 tasks), each tagged with its expected tier. Run the router and watch two metrics:
 
-- **🔴 误降级率**（把 Hard 误判成 Trivial/Routine）→ **趋近 0，这是质量红线**
-- **🟢 节省率**（实际花费 vs 全用 opus）→ 预期 30–50%
+- **falseDowngradeRate** (Hard tasks misjudged as Trivial/Routine and routed below opus) → **approach 0; this is the quality red line.**
+- **savingsRate** (actual spend vs an all-opus baseline) → expected 0.3–0.5.
 
-## 10. 可调参数（待实现时校准）
+Result (see `docs/eval-baseline-2026-07-12.md`): `falseDowngradeRate: 0`, `savingsRate: 0.49` over 50 tasks.
 
-- **路由器模型：** 默认 haiku（每次派生都跑，要便宜）。若 §9 验证显示误降级率偏高，升到 sonnet。
-- **降级门槛：** 默认 `confidence ≥ 0.8`。越高越保守（更接近全 opus），越低越激进。
+## 10. Tunable parameters (calibrate at implementation)
 
-## 11. 未来工作
+- **Router model:** default haiku (runs on every dispatch, must be cheap). If §9 validation shows a high false-downgrade rate, bump the router to sonnet. (Not triggered: false-downgrade rate was 0.)
+- **Downgrade threshold:** default `confidence ≥ 0.8`. Higher = more conservative (closer to all-opus); lower = more aggressive.
 
-- **Workflow 专业模式（batch-route.js）：** 给重度用户提供确定性路由 + budget 自适应降级。当预算接近耗尽时，允许把 opus 向下调（唯一允许的「向下误判」触发条件）。
-- **路由分类法校准：** 基于 §9 的标注集持续优化 tier 判定规则。
-- **国际化：** 设计文档与 README 的英文版本，便于海外传播。
+## 11. Future work
+
+- **Workflow pro mode (`batch-route.js`):** deterministic routing + budget-adaptive downgrade for power users. When the remaining budget drops below a floor, opus may step down to sonnet — the only allowed "downward misjudgment" trigger.
+- **Routing-taxonomy calibration:** continuously refine the tier rules from accumulated eval data.
+- **i18n:** this English design doc and the README are now available; the original Chinese design is retained as `.zh.md`.

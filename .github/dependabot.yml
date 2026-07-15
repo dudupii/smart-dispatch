@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Keep npm devDependencies (e.g. @anthropic-ai/sdk) current.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Keep GitHub Actions (checkout, setup-node, ...) current so action
+  # runtimes don't drift into deprecation (e.g. the Node 20 runtime).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

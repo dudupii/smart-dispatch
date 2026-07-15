@@ -35,7 +35,7 @@ The skill activates automatically whenever a sub-agent is about to be dispatched
 These live in `src/decide-model.js` (the single source of truth; `skills/smart-dispatch/SKILL.md` mirrors them in prose):
 
 - **`DOWNGRADE_THRESHOLD`** (default `0.8`) — the confidence required to leave opus. Raise for more conservative routing (closer to all-opus); lower to downgrade more aggressively.
-- **`BUDGET_FLOOR`** (default `0.1`) — only relevant to budget mode (the deferred Workflow "pro mode"): when remaining budget drops below this fraction, opus steps down to sonnet. Never escalates an already-downgraded task.
+- **`BUDGET_FLOOR`** (default `0.1`) — only relevant to budget mode (the Workflow pro mode, `workflows/batch-route.js`): when remaining budget drops below this fraction, opus steps down to sonnet. Never escalates an already-downgraded task.
 - **Router model** — default Haiku (configured in `eval/run-eval.js`). If eval shows false-downgrades, raise to Sonnet.
 
 ## Validate
@@ -60,6 +60,12 @@ The eval reports two numbers:
 - `eval/` — labeled dataset + harness that validates routing quality end-to-end.
 
 The shipped plugin has **zero runtime dependencies** — the Anthropic SDK is dev-only, used solely by the eval harness.
+
+## Pro mode: batch routing (budget-adaptive)
+
+`workflows/batch-route.js` is a [Workflow](https://docs.claude.com/claude-code/workflows) for batch processing with cost control. It applies the same quality-first policy **plus** budget awareness: when remaining budget drops below `BUDGET_FLOOR`, `opus` tasks step down to `sonnet` (the only allowed downward override of opus). Hand it a task or an array of tasks as `args`; it routes each with Haiku, then executes each on the chosen model.
+
+> **Caveat:** workflow scripts run in a sandbox and cannot `import` local modules, so the policy is **inlined** in the script. `src/decide-model.js` remains the source of truth — keep them in sync. Running it spawns one sub-agent per task (multi-agent orchestration), so it spends tokens.
 
 ## License
 

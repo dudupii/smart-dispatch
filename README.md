@@ -3,7 +3,14 @@
 > Quality-first automatic model routing for Claude Code sub-agents.
 > **Every task gets the right model — default strongest, downgrade only when confidently trivial.**
 
+[![tests](https://img.shields.io/github/actions/workflow/status/dudupii/smart-dispatch/test.yml?branch=master&label=tests)](https://github.com/dudupii/smart-dispatch/actions/workflows/test.yml)
+[![version](https://img.shields.io/github/v/release/dudupii/smart-dispatch?color=blue)](https://github.com/dudupii/smart-dispatch/releases)
+[![license](https://img.shields.io/github/license/dudupii/smart-dispatch?color=green)](./LICENSE)
+[![stars](https://img.shields.io/github/stars/dudupii/smart-dispatch?style=social)](https://github.com/dudupii/smart-dispatch/stargazers)
+
 [English](README.md) · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md)
+
+<p align="center"><img src="docs/demo.gif" alt="smart-dispatch routing demo" width="640"></p>
 
 Most "model routers" optimize for cost and quietly drop quality on hard tasks. smart-dispatch inverts that: **it never loses quality to a routing mistake.** The only acceptable misjudgment is treating a simple task as hard (a little wasted spend) — never the reverse.
 

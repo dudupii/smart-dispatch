@@ -3,3 +3,6 @@ node_modules/
 
 # local session handover notes (not part of the shipped plugin)
 .claude/handovers/
+
+# internal planning/design docs (kept locally, not shipped)
+docs/plans/

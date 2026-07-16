@@ -50,7 +50,7 @@ test('SKILL.md policy numbers match the code (no drift)', () => {
 })
 
 test('all READMEs tuning knobs match the code (no drift)', () => {
-  for (const file of ['../README.md', '../README.zh.md', '../README.zh-TW.md', '../README.ja.md']) {
+  for (const file of ['../README.md', '../README.zh-Hans.md', '../README.zh-Hant.md', '../README.ja.md']) {
     const content = read(file)
     assert.ok(
       content.includes(String(DOWNGRADE_THRESHOLD)),

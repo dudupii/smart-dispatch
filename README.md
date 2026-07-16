@@ -3,7 +3,7 @@
 > Quality-first automatic model routing for Claude Code sub-agents.
 > **Every task gets the right model — default strongest, downgrade only when confidently trivial.**
 
-[English](README.md) · [中文](README.zh.md)
+[English](README.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md)
 
 Most "model routers" optimize for cost and quietly drop quality on hard tasks. smart-dispatch inverts that: **it never loses quality to a routing mistake.** The only acceptable misjudgment is treating a simple task as hard (a little wasted spend) — never the reverse.
 

@@ -1,7 +1,7 @@
 {
   "name": "smart-dispatch",
   "description": "Quality-first automatic model routing for Claude Code sub-agents. Default opus, downgrade only on confident trivial/routine tasks.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "dupi",
     "url": "https://github.com/dudupii"

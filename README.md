@@ -31,7 +31,9 @@ claude plugin marketplace add dudupii/smart-dispatch
 claude plugin install smart-dispatch@smart-dispatch
 ```
 
-The skill activates automatically whenever a sub-agent is about to be dispatched (~70 tokens always-on; ~520 per invoke). If you name a model explicitly, smart-dispatch respects it and skips routing.
+Once installed, routing is **automatic and transparent**: a `PreToolUse` hook intercepts every `Agent` tool call and rewrites the model in place via `updatedInput` — you never have to remember a command, and the model cannot bypass it by calling the Agent tool directly. If you name a model explicitly, smart-dispatch respects it and skips routing.
+
+> The hook uses conservative heuristics (it only downgrades read-only `Explore` tasks). For higher-fidelity routing with a Haiku classifier, invoke `/smart-dispatch` explicitly — both paths share the same `src/decide-model.js` policy and write to the same log.
 
 ## Tuning knobs
 
@@ -57,6 +59,8 @@ The eval reports two numbers:
 ## How it's built
 
 - `src/decide-model.js` — the quality-first policy (single source of truth, fully unit-tested).
+- `src/classify-heuristic.js` — conservative heuristic classifier used by the hook (read-only `Explore` only).
+- `hooks/route.mjs` + `hooks/hooks.json` — the `PreToolUse` hook that makes routing automatic.
 - `src/parse-router-output.js` — defensive parser for the router agent's output.
 - `src/compute-metrics.js` — false-downgrade + savings metrics.
 - `skills/smart-dispatch/SKILL.md` — the shipped skill; mirrors the policy in prose.

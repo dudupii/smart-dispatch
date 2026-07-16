@@ -2,8 +2,8 @@
 // This is the SINGLE SOURCE OF TRUTH for routing decisions.
 // skills/smart-dispatch/SKILL.md mirrors these rules — keep them in sync.
 
-const DOWNGRADE_THRESHOLD = 0.8 // confidence required to leave opus
-const BUDGET_FLOOR = 0.1        // below this remaining-budget fraction, opus may step down
+export const DOWNGRADE_THRESHOLD = 0.8 // confidence required to leave opus
+export const BUDGET_FLOOR = 0.1        // below this remaining-budget fraction, opus may step down
 
 const TIER_MODEL = {
   Trivial: 'haiku',

@@ -77,7 +77,7 @@ Every routing decision is shown inline (`smart-dispatch → haiku (Trivial, conf
 See aggregate stats anytime:
 
 ```bash
-npm run report        # or the /smart-dispatch command in a session
+npm run report        # or the /smart-dispatch-report command in a session
 ```
 
 It reports total decisions, model distribution, estimated savings vs all-opus, and how often budget mode downgraded opus. Override the log path with `SMART_DISPATCH_LOG`.

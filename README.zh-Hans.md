@@ -78,7 +78,7 @@ eval 报告两个数字：
 随时查看聚合统计：
 
 ```bash
-npm run report        # 或在会话里用 /smart-dispatch 命令
+npm run report        # 或在会话里用 /smart-dispatch-report 命令
 ```
 
 它会报告：总决策数、模型分布、相对全 opus 的估算节省、以及预算模式把 opus 降级的频率。用 `SMART_DISPATCH_LOG` 覆盖日志路径。

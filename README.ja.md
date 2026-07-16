@@ -3,7 +3,14 @@
 > Claude Code サブエージェント向けの、品質優先の自動モデルルーティング。
 > **すべてのタスクに正しいモデルを——デフォルトは最強、確信を持って些細な場合のみダウングレード。**
 
+[![tests](https://img.shields.io/github/actions/workflow/status/dudupii/smart-dispatch/test.yml?branch=master&label=tests)](https://github.com/dudupii/smart-dispatch/actions/workflows/test.yml)
+[![version](https://img.shields.io/github/v/release/dudupii/smart-dispatch?color=blue)](https://github.com/dudupii/smart-dispatch/releases)
+[![license](https://img.shields.io/github/license/dudupii/smart-dispatch?color=green)](./LICENSE)
+[![stars](https://img.shields.io/github/stars/dudupii/smart-dispatch?style=social)](https://github.com/dudupii/smart-dispatch/stargazers)
+
 [English](README.md) · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md)
+
+<p align="center"><img src="docs/demo.gif" alt="smart-dispatch routing demo" width="640"></p>
 
 世の中の「モデルルーター」の多くはコスト最適化のために、難しいタスクの品質をこっそり落とします。smart-dispatch は逆です：**ルーティングの失敗で品質を落とすことは絶対にありません。** 許容される誤判断は「簡単なタスクを難しいと扱う」方向（少しだけ無駄遣い）だけです——その逆は絶対にありません。
 

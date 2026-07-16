@@ -3,6 +3,8 @@
 > Quality-first automatic model routing for Claude Code sub-agents.
 > **Every task gets the right model — default strongest, downgrade only when confidently trivial.**
 
+[English](README.md) · [中文](README.zh.md)
+
 Most "model routers" optimize for cost and quietly drop quality on hard tasks. smart-dispatch inverts that: **it never loses quality to a routing mistake.** The only acceptable misjudgment is treating a simple task as hard (a little wasted spend) — never the reverse.
 
 ## What it does
@@ -25,10 +27,11 @@ The router's own `model` suggestion is **ignored** — the policy re-derives the
 ## Install
 
 ```bash
-claude plugin add <your-org>/smart-dispatch
+claude plugin marketplace add dudupii/smart-dispatch
+claude plugin install smart-dispatch@smart-dispatch
 ```
 
-The skill activates automatically whenever a sub-agent is about to be dispatched. If you name a model explicitly, smart-dispatch respects it and skips routing.
+The skill activates automatically whenever a sub-agent is about to be dispatched (~70 tokens always-on; ~520 per invoke). If you name a model explicitly, smart-dispatch respects it and skips routing.
 
 ## Tuning knobs
 

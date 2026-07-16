@@ -31,7 +31,9 @@ claude plugin marketplace add dudupii/smart-dispatch
 claude plugin install smart-dispatch@smart-dispatch
 ```
 
-skill 会在你即将派生 sub-agent 时自动生效（常驻约 70 token；每次触发约 520 token）。如果你显式指定了模型，smart-dispatch 会尊重你的选择并跳过路由。
+安装后，路由是**自动且透明**的：一个 `PreToolUse` hook 拦截每一次 `Agent` 工具调用，通过 `updatedInput` 原地改写模型——你无需记任何命令，模型也无法通过直接调用 Agent 工具绕过它。如果你显式指定了模型，smart-dispatch 会尊重你的选择并跳过路由。
+
+> hook 用的是保守启发式（只降级只读的 `Explore` 任务）。若想要更高保真度的路由（用 Haiku 分类器），可显式调用 `/smart-dispatch`——两条路共用同一份 `src/decide-model.js` 策略，写入同一个日志。
 
 ## 可调参数
 
@@ -57,6 +59,8 @@ eval 报告两个数字：
 ## 它怎么构建的
 
 - `src/decide-model.js`——质量优先策略（唯一真相源，完整单测）。
+- `src/classify-heuristic.js`——hook 使用的保守启发式分类器（仅限只读 `Explore`）。
+- `hooks/route.mjs` + `hooks/hooks.json`——让路由自动化的 `PreToolUse` hook。
 - `src/parse-router-output.js`——路由器输出的防御性解析器。
 - `src/compute-metrics.js`——误降级率 + 节省率指标。
 - `skills/smart-dispatch/SKILL.md`——发布的 skill；用文字镜像策略。

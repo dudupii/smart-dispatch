@@ -78,7 +78,7 @@ eval は 2 つの数字を報告します：
 集計統計はいつでも確認できます：
 
 ```bash
-npm run report        # またはセッション内で /smart-dispatch コマンド
+npm run report        # またはセッション内で /smart-dispatch-report コマンド
 ```
 
 総決定数、モデル分布、全 opus 基準の推定節約率、予算モードで opus が downgrade された頻度を報告します。ログパスは `SMART_DISPATCH_LOG` で上書きできます。

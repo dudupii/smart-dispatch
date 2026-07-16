@@ -49,10 +49,18 @@ test('SKILL.md policy numbers match the code (no drift)', () => {
   )
 })
 
-test('README tuning knobs match the code (no drift)', () => {
-  const readme = read('../README.md')
-  assert.ok(readme.includes(String(DOWNGRADE_THRESHOLD)))
-  assert.ok(readme.includes(String(BUDGET_FLOOR)))
+test('all READMEs tuning knobs match the code (no drift)', () => {
+  for (const file of ['../README.md', '../README.zh.md', '../README.zh-TW.md', '../README.ja.md']) {
+    const content = read(file)
+    assert.ok(
+      content.includes(String(DOWNGRADE_THRESHOLD)),
+      `${file} must reference the downgrade threshold ${DOWNGRADE_THRESHOLD}`
+    )
+    assert.ok(
+      content.includes(String(BUDGET_FLOOR)),
+      `${file} must reference the budget floor ${BUDGET_FLOOR}`
+    )
+  }
 })
 
 test('policy sanity check (guards against accidental policy change)', () => {

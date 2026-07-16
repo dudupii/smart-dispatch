@@ -1,9 +1,17 @@
 {
-  "PreToolUse": [
-    {
-      "matcher": "Agent",
-      "type": "command",
-      "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/route.mjs\""
-    }
-  ]
+  "description": "smart-dispatch — transparent model routing for Agent calls",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/route.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }

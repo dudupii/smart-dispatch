@@ -3,7 +3,7 @@
 > 針對 Claude Code 子代理（sub-agent）的、品質優先的自動模型路由。
 > **每個任務都用對的模型——預設最強，只在確信瑣碎時降級。**
 
-[English](README.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md)
+[English](README.md) · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md)
 
 市面上多數的「模型路由器」為了省錢而最佳化，悄悄在困難任務上犧牲品質。smart-dispatch 反其道而行：**它絕不會因為路由失誤而犧牲品質。** 唯一可接受的誤判方向，是把簡單任務當成困難任務（多花一點）——絕不反向為之。
 

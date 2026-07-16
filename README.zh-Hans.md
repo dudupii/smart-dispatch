@@ -71,6 +71,18 @@ eval 报告两个数字：
 
 > **注意：** workflow 脚本运行在沙箱里，无法 `import` 本地模块，所以策略在脚本里**内联**了一份。`src/decide-model.js` 仍是唯一真相源——请保持同步。运行它会按任务数派生 sub-agent（多 agent 编排），会消耗 token。
 
+## 可观测性
+
+每次路由决策都会在对话里显示一行（`smart-dispatch → haiku (Trivial, conf 0.92)`），并追加到本地日志 `~/.smart-dispatch/log.jsonl`——**只记录 `tier`、`confidence`、`model` 和时间戳，绝不记录任务原文**。
+
+随时查看聚合统计：
+
+```bash
+npm run report        # 或在会话里用 /smart-dispatch 命令
+```
+
+它会报告：总决策数、模型分布、相对全 opus 的估算节省、以及预算模式把 opus 降级的频率。用 `SMART_DISPATCH_LOG` 覆盖日志路径。
+
 ## 许可证
 
 MIT。

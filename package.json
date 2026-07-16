@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "eval": "node eval/run-eval.js"
+    "eval": "node eval/run-eval.js",
+    "report": "node scripts/report.mjs"
   },
   "license": "MIT",
   "devDependencies": {

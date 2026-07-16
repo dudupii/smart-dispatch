@@ -70,6 +70,18 @@ The shipped plugin has **zero runtime dependencies** — the Anthropic SDK is de
 
 > **Caveat:** workflow scripts run in a sandbox and cannot `import` local modules, so the policy is **inlined** in the script. `src/decide-model.js` remains the source of truth — keep them in sync. Running it spawns one sub-agent per task (multi-agent orchestration), so it spends tokens.
 
+## Observability
+
+Every routing decision is shown inline (`smart-dispatch → haiku (Trivial, conf 0.92)`) and appended to a local log at `~/.smart-dispatch/log.jsonl` — **only `tier`, `confidence`, `model`, and a timestamp** are recorded, never the task text.
+
+See aggregate stats anytime:
+
+```bash
+npm run report        # or the /smart-dispatch command in a session
+```
+
+It reports total decisions, model distribution, estimated savings vs all-opus, and how often budget mode downgraded opus. Override the log path with `SMART_DISPATCH_LOG`.
+
 ## License
 
 MIT.

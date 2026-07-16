@@ -3,7 +3,14 @@
 > 面向 Claude Code sub-agent 的、质量优先的自动模型路由。
 > **每个任务都用对的模型——默认最强，只在确信琐碎时降级。**
 
+[![tests](https://img.shields.io/github/actions/workflow/status/dudupii/smart-dispatch/test.yml?branch=master&label=tests)](https://github.com/dudupii/smart-dispatch/actions/workflows/test.yml)
+[![version](https://img.shields.io/github/v/release/dudupii/smart-dispatch?color=blue)](https://github.com/dudupii/smart-dispatch/releases)
+[![license](https://img.shields.io/github/license/dudupii/smart-dispatch?color=green)](./LICENSE)
+[![stars](https://img.shields.io/github/stars/dudupii/smart-dispatch?style=social)](https://github.com/dudupii/smart-dispatch/stargazers)
+
 [English](README.md) · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md)
+
+<p align="center"><img src="docs/demo.gif" alt="smart-dispatch routing demo" width="640"></p>
 
 市面上的「模型路由器」大多为省钱而优化，悄悄在难任务上掉质量。smart-dispatch 反过来：**它绝不会因为路由失误而掉质量。** 唯一可接受的误判方向，是把简单任务当成难任务（多花一点）——绝不反过来。
 

@@ -10,6 +10,6 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.112.5"
+    "@anthropic-ai/sdk": "^0.120.0"
   }
 }

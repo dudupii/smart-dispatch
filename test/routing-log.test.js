@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import * as assert from 'node:assert'
-import { parseLog, summarizeEntries } from '../src/routing-log.js'
+import { parseLog, summarizeEntries, filterSince } from '../src/routing-log.js'
 
 test('parseLog: valid JSONL lines become entries', () => {
   const text =
@@ -63,4 +63,36 @@ test('summarizeEntries: recent caps at last 10', () => {
   const s = summarizeEntries(entries)
   assert.equal(s.recent.length, 10)
   assert.equal(s.recent[0].ts, '2') // dropped the first two
+})
+
+test('summarizeEntries: byTier / byAgent / escalations', () => {
+  const s = summarizeEntries([
+    { tier: 'Trivial', model: 'haiku', agent: 'Explore' },
+    { tier: 'Trivial', model: 'haiku', agent: 'Explore' },
+    { tier: 'Retry', model: 'opus', agent: 'Explore', escalatedFrom: 'haiku' },
+    { tier: 'Hard', model: 'opus' }, // no agent — not counted in byAgent
+  ])
+  assert.deepEqual(s.byTier, { Trivial: 2, Retry: 1, Hard: 1 })
+  assert.deepEqual(s.byAgent, { Explore: 3 })
+  assert.equal(s.escalations, 1)
+})
+
+test('summarizeEntries: relativeCost override changes the savings estimate', () => {
+  const entries = [{ tier: 'Trivial', model: 'haiku' }, { tier: 'Hard', model: 'opus' }]
+  const stock = summarizeEntries(entries)
+  const doubled = summarizeEntries(entries, { relativeCost: { haiku: 0.2, sonnet: 0.3, opus: 1.0 } })
+  assert.equal(stock.savingsRate, 0.45)
+  assert.equal(doubled.savingsRate, 0.4)
+})
+
+test('filterSince: keeps in-window entries, drops undatable ones', () => {
+  const entries = [
+    { ts: '2026-09-01T00:00:00Z', model: 'haiku' },
+    { ts: '2026-09-02T00:00:00Z', model: 'opus' },
+    { ts: 'garbage', model: 'sonnet' },
+    { model: 'haiku' }, // no ts at all
+  ]
+  const kept = filterSince(entries, Date.parse('2026-09-01T12:00:00Z'))
+  assert.deepEqual(kept.map((e) => e.model), ['opus'])
+  assert.deepEqual(filterSince(entries, 0).length, 2, 'undatable entries never match a window')
 })

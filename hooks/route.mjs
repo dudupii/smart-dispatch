@@ -15,6 +15,7 @@
 
 import { decideModel } from '../src/decide-model.js'
 import { classifyHeuristic } from '../src/classify-heuristic.js'
+import { loadConfig } from '../src/config.js'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -66,6 +67,27 @@ async function main() {
   // Respect an explicit model choice (user or model-set) — treat as override.
   if (toolInput.model && String(toolInput.model).trim()) return emitEmpty()
 
+  const config = loadConfig()
+
+  // Per-agent-type overrides from the config file — the user's fixed routing
+  // for known agents, checked before heuristics. "never" disables routing for
+  // that type entirely (no log entry — it is not a routing decision).
+  const override = config.agentOverrides[toolInput.subagent_type]
+  if (override === 'never') return emitEmpty()
+  if (override) {
+    logDecision({ tier: 'Override', confidence: 1, model: override })
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'allow',
+          updatedInput: { ...toolInput, model: override },
+        },
+      }),
+    )
+    return
+  }
+
   const h = classifyHeuristic({
     subagent_type: toolInput.subagent_type,
     prompt: toolInput.prompt,
@@ -74,7 +96,10 @@ async function main() {
   })
   if (h.skip) return emitEmpty()
 
-  const decision = decideModel({ tier: h.tier, confidence: h.confidence })
+  const decision = decideModel(
+    { tier: h.tier, confidence: h.confidence },
+    { downgradeThreshold: config.downgradeThreshold, budgetFloor: config.budgetFloor },
+  )
 
   // Log every routed decision (including non-downgrades) for report visibility.
   logDecision({ tier: h.tier || 'Unknown', confidence: h.confidence ?? 0, model: decision.model })

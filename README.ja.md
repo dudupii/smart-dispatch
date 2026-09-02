@@ -1,7 +1,7 @@
 # smart-dispatch
 
 > Claude Code サブエージェント向けの、品質優先の自動モデルルーティング。
-> **すべてのタスクに正しいモデルを——デフォルトは最強、確信を持って些細な場合のみダウングレード。**
+> **すべてのタスクに正しいモデルを——デフォルトは最強、確信できる琐碎タスクのみダウングレード。**
 
 [![tests](https://img.shields.io/github/actions/workflow/status/dudupii/smart-dispatch/test.yml?branch=master&label=tests)](https://github.com/dudupii/smart-dispatch/actions/workflows/test.yml)
 [![version](https://img.shields.io/github/v/release/dudupii/smart-dispatch?color=blue)](https://github.com/dudupii/smart-dispatch/releases)
@@ -12,24 +12,24 @@
 
 <p align="center"><img src="docs/demo.gif" alt="smart-dispatch routing demo" width="640"></p>
 
-世の中の「モデルルーター」の多くはコスト最適化のために、難しいタスクの品質をこっそり落とします。smart-dispatch は逆です：**ルーティングの失敗で品質を落とすことは絶対にありません。** 許容される誤判断は「簡単なタスクを難しいと扱う」方向（少しだけ無駄遣い）だけです——その逆は絶対にありません。
+世の中の「モデルルーター」の多くはコスト最適化のために、難しいタスクで静かに品質を落とします。smart-dispatch は逆です：**ルーティングの判断ミスで品質を落とすことは決してありません。** 許容される誤判定は「簡単なタスクを難しいと扱う」方向（少し無駄な出費）だけ——その逆は決してありません。
 
 ## 何をするか
 
 サブエージェントをディスパッチする前に、smart-dispatch は：
 
-1. **安いモデル**（Haiku）でタスクを分類し、`{tier, confidence}` を得ます。
-2. **品質優先ポリシー**を適用します。デフォルトは `opus`。`tier ∈ {Trivial, Routine}` かつ `confidence ≥ 0.8` の場合のみダウングレードします。
-3. 選ばれたモデルでワーカーをディスパッチします。
+1. **安価なモデル**（Haiku）でタスクを分類 → `{tier, confidence}`。
+2. **品質優先ポリシー**を適用：デフォルトは `opus`。`tier ∈ {Trivial, Routine}` かつ `confidence ≥ 0.8` のときのみダウングレード。
+3. 選ばれたモデルでワーカーエージェントをディスパッチ。
 
 | Tier | 例 | モデル |
-|------|------|------|
-| Trivial（些細） | grep、ファイル一覧、設定読み込み、文字列検索 | haiku |
-| Routine（定型） | 明確なパターンの編集、要約、フォーマット、テンプレ適用 | sonnet |
-| Hard（困難） | 推論、設計、デバッグ、複数ファイル、新規コード、アーキテクチャ | opus |
+|------|----|--------|
+| Trivial | grep、ファイル一覧、設定の読み取り | haiku |
+| Routine | 定型的な編集、要約、フォーマット | sonnet |
+| Hard | 設計、デバッグ、新規コード、アーキテクチャ | opus |
 | 不確実 | 曖昧なものすべて | opus（フォールバック） |
 
-ルーター自身が出力する `model` フィールドは**無視されます**——ポリシーは `tier` + `confidence` だけで選択を再決定します。
+ルーター自身が出力する `model` フィールドは**無視されます**——ポリシーは `tier` + `confidence` だけから決定し直します。
 
 ## インストール
 
@@ -38,14 +38,28 @@ claude plugin marketplace add dudupii/smart-dispatch
 claude plugin install smart-dispatch@smart-dispatch
 ```
 
-サブエージェントをディスパッチしようとすると自動的にスキルが働きます（常時約 70 トークン、起動ごとに約 520 トークン）。モデルを明示的に指定すれば、smart-dispatch はそれを尊重しルーティングをスキップします。
+インストール後、ルーティングは**自動かつ透明**です。`PreToolUse` フックがすべての `Agent` ツール呼び出しを横取りし、`updatedInput` でモデルをその場で書き換えます——コマンドを覚える必要はなく、モデルが Agent ツールを直接呼んでも迂回できません。モデルを明示的に指定した場合は、それを尊重してルーティングをスキップします。
+
+> フックが使うのは保守的なヒューリスティクスです（読み取り専用の `Explore` タスクに加え、短くて読み取り専用／機械的な `general-purpose` プロンプト向けの狭いゲート）。ダウングレードが誤りだった場合、同じタスクの次のディスパッチはセッション既定のモデルへ**自己修復**されます——[オブザーバビリティ](#オブザーバビリティ)を参照。より高精度なルーティング（Haiku 分類器）には `/smart-dispatch` を明示的に呼び出してください——両経路は同じ `src/decide-model.js` ポリシーを共有し、同じログに書き込みます。`SMART_DISPATCH_DRY=1` を設定すると、呼び出しを書き換えずにログだけでルーティング決定をプレビューできます。
 
 ## チューニングノブ
 
-どちらも `src/decide-model.js` にあります（唯一の信頼できる情報源。`skills/smart-dispatch/SKILL.md` が文章でミラーしています）：
+チューニングは**ソース編集ではなくデータ**です。デフォルトは `src/decide-model.js`（唯一の信頼できる情報源）にあり、`~/.smart-dispatch/config.json`（パスは `SMART_DISPATCH_CONFIG`）または環境変数で上書きできます：
 
-- **`DOWNGRADE_THRESHOLD`**（デフォルト `0.8`）—— opus から離れるために必要な信頼度。上げる = より保守的（ほぼ全 opus）、下げる = より積極的にダウングレード。
-- **`BUDGET_FLOOR`**（デフォルト `0.1`）—— 予算モード（Workflow プロモード `workflows/batch-route.js`）でのみ意味を持ちます。残り予算がこの割合を下回ると、opus が sonnet に下がります。すでにダウングレード済みのタスクを昇格させることはありません。
+```json
+{
+  "downgradeThreshold": 0.8,
+  "budgetFloor": 0.1,
+  "escalation": { "enabled": true, "windowMinutes": 10 },
+  "agentOverrides": { "my-file-finder": "haiku", "my-careful-agent": "never" },
+  "priceTable": { "haiku": 0.1, "sonnet": 0.3, "opus": 1.0 }
+}
+```
+
+- **`downgradeThreshold`**（デフォルト `0.8`、環境変数 `SMART_DISPATCH_THRESHOLD`）—— opus から離れるために必要な信頼度。上げる = より保守的、下げる = より積極的にダウングレード。
+- **`budgetFloor`**（デフォルト `0.1`、環境変数 `SMART_DISPATCH_BUDGET_FLOOR`）—— 予算モード（Workflow プロモード）のみ：残り予算がこの割合を下回ると opus が sonnet に下がります。
+- **`escalation`**（キルスイッチ：`SMART_DISPATCH_ESCALATION=0`）—— ダウングレード後に再ディスパッチされたタスクの自己修復ウィンドウ。
+- **`agentOverrides`** —— サブエージェントタイプごとの固定モデル（ユーザー上書きとしてそのまま適用）、または `"never"` でそのタイプを対象外に。
 - **ルーターモデル** —— デフォルトは Haiku（`eval/run-eval.js` で設定）。eval で誤ダウングレードが見られれば Sonnet に引き上げます。
 
 ## 検証
@@ -64,8 +78,12 @@ eval は 2 つの数字を報告します：
 ## どう構築されているか
 
 - `src/decide-model.js` —— 品質優先ポリシー（唯一の信頼できる情報源、完全ユニットテスト済み）。
+- `src/classify-heuristic.js` —— フックが使う保守的なヒューリスティック分類器（読み取り専用 `Explore` + general-purpose の狭いゲート）。敵対的テストで門番されています。
+- `hooks/route.mjs` + `hooks/hooks.json` —— ルーティングを自動化する `PreToolUse` フック。
+- `src/config.js` —— ユーザー設定（ファイル + 環境変数）。例外を投げず、無効な値はフォールバック。
+- `src/escalation.js` —— リトライ・エスカレーション：誤ったダウングレードを次のディスパッチで自己修復。
 - `src/parse-router-output.js` —— ルーターエージェント出力の防御的パーサー。
-- `src/compute-metrics.js` —— 誤ダウングレード率 + 削減率メトリクス。
+- `src/compute-metrics.js` —— 誤ダウングレード率 + 削減率メトリクス。バージョン付き価格テーブルを同梱。
 - `skills/smart-dispatch/SKILL.md` —— 同梱のスキル。ポリシーを文章でミラー。
 - `.claude-plugin/plugin.json` + `marketplace.json` —— プラグインマニフェストとマーケットプレースエントリ。
 - `eval/` —— ラベル付きデータセット + ルーティング品質をエンドツーエンドで検証するハーネス。
@@ -74,21 +92,24 @@ eval は 2 つの数字を報告します：
 
 ## プロモード：バッチルーティング（予算適応型）
 
-`workflows/batch-route.js` は、バッチ処理とコスト制御のための [Workflow](https://docs.claude.com/claude-code/workflows) です。同じ品質優先ポリシーを適用しつつ、**予算認識**を追加します。残り予算が `BUDGET_FLOOR` を下回ると、`opus` タスクが `sonnet` に下がります（許容される唯一の opus の下方上書き）。タスク 1 つ、またはタスクの配列を `args` に渡してください。Haiku で各タスクをルーティングし、選ばれたモデルで実行します。
+`workflows/batch-route.js` は、バッチ処理とコスト制御のための [Workflow](https://docs.claude.com/claude-code/workflows) です。同じ品質優先ポリシーに**予算認識**を加えます：残り予算が `budgetFloor` を下回ると、`opus` タスクが `sonnet` に下がります（許容される唯一の opus の下方上書き）。タスク 1 つ、またはタスクの配列を `args` に渡してください。Haiku で各タスクをルーティングし、選ばれたモデルで実行します。
 
-> **注意：** ワークフロースクリプトはサンドボックスで動作しローカルモジュールを `import` できないため、ポリシーはスクリプト内に**インライン**で複製されています。`src/decide-model.js` が唯一の信頼できる情報源です——同期を保ってください。実行するとタスクごとにサブエージェントをスポーンするため（マルチエージェントオーケストレーション）、トークンを消費します。
+> **注意：** ワークフロースクリプトはサンドボックスで動作しローカルモジュールを `import` できないため、ポリシーはスクリプト内に**インライン**で複製されています（同期ガードテストが門番します）。`src/decide-model.js` が唯一の信頼できる情報源です。実行するとタスクごとにサブエージェントをスポーンするため（マルチエージェントオーケストレーション）、トークンを消費します。
 
 ## オブザーバビリティ
 
-毎回のルーティング決定はインラインで 1 行表示され（`smart-dispatch → haiku (Trivial, conf 0.92)`）、ローカルログ `~/.smart-dispatch/log.jsonl` に追記されます——**記録されるのは `tier`、`confidence`、`model`、タイムスタンプだけで、タスク本文は一切記録されません**。
+毎回のルーティング決定はインラインで 1 行表示され（`smart-dispatch → haiku (Trivial, conf 0.92)`）、ローカルログ `~/.smart-dispatch/log.jsonl` に追記されます——**記録されるのは `tier`、`confidence`、`model`、タイムスタンプ、サブエージェントタイプ、タスクの一方向 `hash` だけで、タスク本文は一切記録されません**。`Retry` エントリは自己修復された各ダウングレード（`escalatedFrom`）を記録します。エスカレーションウィンドウ内で同じタスクが再ディスパッチされ、直前が opus 未満にルーティングされていた場合、フックはダウングレードを差し控え、その修正をログに残します——誤ダウングレード 1 回のコストは安価な試行 1 回であって、タスクの破壊ではありません。
 
 集計統計はいつでも確認できます：
 
 ```bash
-npm run report        # またはセッション内で /smart-dispatch-report コマンド
+npm run report                    # またはセッション内で /smart-dispatch-report コマンド
+npm run report -- --today         # 今日のみ
+npm run report -- --since 7d      # 直近 7 日（24h や 2026-08-01 も可）
+npm run report -- --json          # 機械可読フォーマット
 ```
 
-総決定数、モデル分布、全 opus 基準の推定節約率、予算モードで opus が downgrade された頻度を報告します。ログパスは `SMART_DISPATCH_LOG` で上書きできます。
+総決定数、モデル／tier／agent 分布、全 opus 基準の推定節約率（使用したバージョン付き価格テーブルの明記付き——どの価格を使った見積もりかが分かります）、予算モードでのダウングレード頻度、自己修復されたリトライ数を報告します。ログパスは `SMART_DISPATCH_LOG` で上書きできます。
 
 ## ライセンス
 

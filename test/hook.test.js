@@ -180,3 +180,37 @@ test('agentOverrides: "never" disables routing for that type — no rewrite, no 
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// ── dry-run (SMART_DISPATCH_DRY=1) ───────────────────────────────────────────
+
+test('dry-run: decision is logged but the call is never rewritten', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const log = join(dir, 'log.jsonl')
+  try {
+    // A prompt that would normally downgrade to haiku.
+    const r = runHook({
+      tool_input: { subagent_type: 'Explore', description: 'find', prompt: 'find all usages of X' },
+      env: { SMART_DISPATCH_LOG: log, SMART_DISPATCH_DRY: '1' },
+    })
+    assert.deepEqual(r, {}, 'dry-run must not rewrite the model')
+    const entry = JSON.parse(readFileSync(log, 'utf8').trim().split('\n').pop())
+    assert.equal(entry.model, 'haiku', 'the would-be decision is still logged')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('dry-run also applies to agentOverrides', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const config = join(dir, 'config.json')
+  writeFileSync(config, JSON.stringify({ agentOverrides: { 'my-finder': 'haiku' } }))
+  try {
+    const r = runHook({
+      tool_input: { subagent_type: 'my-finder', prompt: 'anything' },
+      env: { SMART_DISPATCH_CONFIG: config, SMART_DISPATCH_DRY: '1' },
+    })
+    assert.deepEqual(r, {})
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

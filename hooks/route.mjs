@@ -69,6 +69,10 @@ async function main() {
 
   const config = loadConfig()
 
+  // Dry-run: classify and log as usual, but never rewrite the call. Lets a
+  // cautious user preview routing decisions before letting the hook act.
+  const dryRun = ['1', 'true'].includes(String(process.env.SMART_DISPATCH_DRY || '').toLowerCase())
+
   // Per-agent-type overrides from the config file — the user's fixed routing
   // for known agents, checked before heuristics. "never" disables routing for
   // that type entirely (no log entry — it is not a routing decision).
@@ -76,6 +80,7 @@ async function main() {
   if (override === 'never') return emitEmpty()
   if (override) {
     logDecision({ tier: 'Override', confidence: 1, model: override })
+    if (dryRun) return emitEmpty()
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
@@ -106,8 +111,8 @@ async function main() {
 
   // Only rewrite on an actual downgrade. Otherwise leave the call untouched —
   // an empty `model` inherits the session default (usually opus), which is
-  // exactly what we want for Hard/uncertain tasks.
-  if (!decision.downgraded) return emitEmpty()
+  // exactly what we want for Hard/uncertain tasks. In dry-run, never rewrite.
+  if (!decision.downgraded || dryRun) return emitEmpty()
 
   // updatedInput REPLACES tool_input — echo the full object, only model changed.
   const updatedInput = { ...toolInput, model: decision.model }

@@ -1,6 +1,6 @@
 # Privacy Policy — smart-dispatch
 
-**Last updated: 2026-07-16**
+**Last updated: 2026-09-02**
 
 smart-dispatch is a Claude Code plugin that selects a model before dispatching a sub-agent. It is built to collect no personal data and to contact no external service of its own.
 
@@ -12,10 +12,10 @@ smart-dispatch is a Claude Code plugin that selects a model before dispatching a
 
 ## Local log
 
-When the skill routes a task, it appends a single line to a **local file on your machine**:
+When smart-dispatch routes a task (hook or skill), it appends a single line to a **local file on your machine**:
 
 - Path: `~/.smart-dispatch/log.jsonl` (override with the `SMART_DISPATCH_LOG` environment variable)
-- Contents: **only** `{ timestamp, tier, confidence, model }` — the routing decision metadata.
+- Contents: **only** `{ timestamp, tier, confidence, model, agent, hash, escalatedFrom }` — routing metadata. `agent` is the sub-agent type name; `hash` is a **10-character one-way SHA-256 digest** of the normalized task text used to recognize a re-dispatched task for self-healing — it cannot be reversed to recover the task; `escalatedFrom` marks a self-healed retry.
 - It does **not** record task text, prompts, code, file contents, or anything identifying.
 
 This file never leaves your machine. You can read it, delete it (`rm ~/.smart-dispatch/log.jsonl`), or disable logging entirely by setting `SMART_DISPATCH_LOG=/dev/null`.

@@ -88,11 +88,28 @@ test('non-Agent tools are a no-op — emits {}', () => {
   }
 })
 
-test('non-Explore agents are never downgraded — emits {}', () => {
-  for (const subagent_type of ['general-purpose', 'Plan', 'code-reviewer']) {
+test('non-Explore agents outside general-purpose are never downgraded — emits {}', () => {
+  for (const subagent_type of ['Plan', 'code-reviewer', 'my-custom-agent']) {
     const r = runHook({ tool_input: { subagent_type, prompt: 'find all the things' } })
     assert.deepEqual(r, {}, `${subagent_type} should stay on opus`)
   }
+})
+
+test('general-purpose: short read-only search downgrades to haiku', () => {
+  const r = runHook({
+    tool_input: { subagent_type: 'general-purpose', prompt: 'find all TODO comments in src/' },
+  })
+  assert.equal(r.hookSpecificOutput.updatedInput.model, 'haiku')
+})
+
+test('general-purpose: search-then-fix trap stays on opus — emits {}', () => {
+  const r = runHook({
+    tool_input: {
+      subagent_type: 'general-purpose',
+      prompt: 'find the root cause of the flaky test and fix it',
+    },
+  })
+  assert.deepEqual(r, {})
 })
 
 test('hard keyword inside Explore stays on opus — emits {}', () => {

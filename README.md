@@ -40,14 +40,26 @@ claude plugin install smart-dispatch@smart-dispatch
 
 Once installed, routing is **automatic and transparent**: a `PreToolUse` hook intercepts every `Agent` tool call and rewrites the model in place via `updatedInput` — you never have to remember a command, and the model cannot bypass it by calling the Agent tool directly. If you name a model explicitly, smart-dispatch respects it and skips routing.
 
-> The hook uses conservative heuristics (it only downgrades read-only `Explore` tasks). For higher-fidelity routing with a Haiku classifier, invoke `/smart-dispatch` explicitly — both paths share the same `src/decide-model.js` policy and write to the same log.
+> The hook uses conservative heuristics (read-only `Explore` tasks, plus a narrow gate for short read-only/mechanical `general-purpose` prompts). If a downgrade turns out to be wrong, the next dispatch of the same task is **self-healed** back to the session default — see [retry-escalation](#observability). For higher-fidelity routing with a Haiku classifier, invoke `/smart-dispatch` explicitly — both paths share the same `src/decide-model.js` policy and write to the same log. Set `SMART_DISPATCH_DRY=1` to preview routing decisions in the log without ever rewriting a call.
 
 ## Tuning knobs
 
-These live in `src/decide-model.js` (the single source of truth; `skills/smart-dispatch/SKILL.md` mirrors them in prose):
+Tuning is **data, not source edits**. Defaults live in `src/decide-model.js` (the single source of truth) and can be overridden by `~/.smart-dispatch/config.json` (path via `SMART_DISPATCH_CONFIG`) or env vars:
 
-- **`DOWNGRADE_THRESHOLD`** (default `0.8`) — the confidence required to leave opus. Raise for more conservative routing (closer to all-opus); lower to downgrade more aggressively.
-- **`BUDGET_FLOOR`** (default `0.1`) — only relevant to budget mode (the Workflow pro mode, `workflows/batch-route.js`): when remaining budget drops below this fraction, opus steps down to sonnet. Never escalates an already-downgraded task.
+```json
+{
+  "downgradeThreshold": 0.8,
+  "budgetFloor": 0.1,
+  "escalation": { "enabled": true, "windowMinutes": 10 },
+  "agentOverrides": { "my-file-finder": "haiku", "my-careful-agent": "never" },
+  "priceTable": { "haiku": 0.1, "sonnet": 0.3, "opus": 1.0 }
+}
+```
+
+- **`downgradeThreshold`** (default `0.8`, env `SMART_DISPATCH_THRESHOLD`) — the confidence required to leave opus. Raise for more conservative routing (closer to all-opus); lower to downgrade more aggressively.
+- **`budgetFloor`** (default `0.1`, env `SMART_DISPATCH_BUDGET_FLOOR`) — only relevant to budget mode (the Workflow pro mode, `workflows/batch-route.js`): when remaining budget drops below this fraction, opus steps down to sonnet. Never escalates an already-downgraded task.
+- **`escalation`** (env kill switch `SMART_DISPATCH_ESCALATION=0`) — self-healing window for re-dispatched tasks that were downgraded.
+- **`agentOverrides`** — a fixed model per subagent type (applied verbatim, like a user override), or `"never"` to leave that type untouched.
 - **Router model** — default Haiku (configured in `eval/run-eval.js`). If eval shows false-downgrades, raise to Sonnet.
 
 ## Validate
@@ -66,10 +78,12 @@ The eval reports two numbers:
 ## How it's built
 
 - `src/decide-model.js` — the quality-first policy (single source of truth, fully unit-tested).
-- `src/classify-heuristic.js` — conservative heuristic classifier used by the hook (read-only `Explore` only).
+- `src/classify-heuristic.js` — conservative heuristic classifier used by the hook (read-only `Explore`; narrow general-purpose gate), gated by adversarial tests.
 - `hooks/route.mjs` + `hooks/hooks.json` — the `PreToolUse` hook that makes routing automatic.
+- `src/config.js` — user config (file + env), never throws, invalid values fall back.
+- `src/escalation.js` — retry-escalation: self-heals a wrong downgrade on the next dispatch.
 - `src/parse-router-output.js` — defensive parser for the router agent's output.
-- `src/compute-metrics.js` — false-downgrade + savings metrics.
+- `src/compute-metrics.js` — false-downgrade + savings metrics, with a versioned price table.
 - `skills/smart-dispatch/SKILL.md` — the shipped skill; mirrors the policy in prose.
 - `eval/` — labeled dataset + harness that validates routing quality end-to-end.
 
@@ -79,19 +93,22 @@ The shipped plugin has **zero runtime dependencies** — the Anthropic SDK is de
 
 `workflows/batch-route.js` is a [Workflow](https://docs.claude.com/claude-code/workflows) for batch processing with cost control. It applies the same quality-first policy **plus** budget awareness: when remaining budget drops below `BUDGET_FLOOR`, `opus` tasks step down to `sonnet` (the only allowed downward override of opus). Hand it a task or an array of tasks as `args`; it routes each with Haiku, then executes each on the chosen model.
 
-> **Caveat:** workflow scripts run in a sandbox and cannot `import` local modules, so the policy is **inlined** in the script. `src/decide-model.js` remains the source of truth — keep them in sync. Running it spawns one sub-agent per task (multi-agent orchestration), so it spends tokens.
+> **Caveat:** workflow scripts run in a sandbox and cannot `import` local modules, so the policy is **inlined** in the script — a sync-guard test (`test/policy-sync.test.js`) fails CI if the copy ever drifts from `src/decide-model.js`. Running it spawns one sub-agent per task (multi-agent orchestration), so it spends tokens.
 
 ## Observability
 
-Every routing decision is shown inline (`smart-dispatch → haiku (Trivial, conf 0.92)`) and appended to a local log at `~/.smart-dispatch/log.jsonl` — **only `tier`, `confidence`, `model`, and a timestamp** are recorded, never the task text.
+Every routing decision is shown inline (`smart-dispatch → haiku (Trivial, conf 0.92)`) and appended to a local log at `~/.smart-dispatch/log.jsonl` — **only `tier`, `confidence`, `model`, a timestamp, the subagent type, and a one-way `hash` of the task** are recorded, never the task text. A `Retry` entry records each self-healed downgrade (`escalatedFrom`): when the same task is re-dispatched within the escalation window after being routed below opus, the hook withholds the downgrade and logs the correction — a wrong downgrade costs one cheap attempt, not a broken task.
 
 See aggregate stats anytime:
 
 ```bash
-npm run report        # or the /smart-dispatch-report command in a session
+npm run report                    # or the /smart-dispatch-report command in a session
+npm run report -- --today         # today only
+npm run report -- --since 7d      # last 7 days (or 24h, or 2026-08-01)
+npm run report -- --json          # machine-readable
 ```
 
-It reports total decisions, model distribution, estimated savings vs all-opus, and how often budget mode downgraded opus. Override the log path with `SMART_DISPATCH_LOG`.
+It reports total decisions, model/tier/agent distribution, estimated savings vs all-opus (labeled with the versioned price table — the estimate is honest about which prices it used), budget-mode downgrades, and self-healed retries. Override the log path with `SMART_DISPATCH_LOG`.
 
 ## License
 

@@ -38,6 +38,16 @@ const tasks = [
     prompt: 'implement the login flow and write tests',
   },
   {
+    label: 'general-purpose · find all TODO comments',
+    agent: 'general-purpose',
+    prompt: 'find all TODO comments in src/ and list them',
+  },
+  {
+    label: 'general-purpose · "…find the leak and fix it"',
+    agent: 'general-purpose',
+    prompt: 'find the root cause of the memory leak and fix it',
+  },
+  {
     label: 'Explore · explicit model: sonnet',
     agent: 'Explore',
     prompt: 'grep the changelog for v0.2',
@@ -71,5 +81,6 @@ for (const t of tasks) {
   console.log(`  ${label}  ${r.tier.padEnd(W.tier)}${r.conf.toString().padEnd(W.conf)}  ${model(r.model)}  ${r.note}`)
 }
 
-console.log(dim('\n  Hard tasks, uncertain tasks, and non-Explore agents stay on opus.'))
-console.log(dim('  Only confident read-only tasks downgrade — never lose quality to a routing mistake.\n'))
+console.log(dim('\n  Hard tasks, uncertain prompts, and search-then-fix traps stay on opus.'))
+console.log(dim('  Confident read-only/mechanical tasks downgrade — and a re-dispatched'))
+console.log(dim('  downgrade self-heals to the session default. Never lose quality.\n'))

@@ -8,7 +8,7 @@
 // to rewrite the model in place. A malformed hooks.json or a broken
 // updatedInput shape would be caught here, not by the unit tests.
 
-import { test } from 'node:test'
+import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
@@ -19,14 +19,26 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const HOOK = join(__dirname, '..', 'hooks', 'route.mjs')
 
+// Isolate every hook run's log by default. Without this the hook appends to
+// the developer's real ~/.smart-dispatch/log.jsonl — junk entries in real
+// stats, and (worse) retry-escalation would fire across test runs as the same
+// prompts recur. Tests that pass SMART_DISPATCH_LOG explicitly override it.
+const tmpRoot = mkdtempSync(join(tmpdir(), 'sd-hooktest-'))
+let runCount = 0
+after(() => rmSync(tmpRoot, { recursive: true, force: true }))
+
 // Run the hook with the given tool_name/tool_input and return parsed stdout.
-// `extra` lets tests inject env (e.g. SMART_DISPATCH_LOG) or a raw stdin.
+// `env` lets tests inject env (e.g. SMART_DISPATCH_CONFIG) or a raw stdin.
 function runHook({ tool_name = 'Agent', tool_input = {}, env = {}, stdin } = {}) {
   const payload = stdin ?? JSON.stringify({ tool_name, tool_input })
   const res = spawnSync('node', [HOOK], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: {
+      ...process.env,
+      SMART_DISPATCH_LOG: join(tmpRoot, `log-${++runCount}.jsonl`),
+      ...env,
+    },
   })
   assert.equal(res.status, 0, `hook exited ${res.status}\nstderr: ${res.stderr}`)
   const out = res.stdout.trim()
@@ -210,6 +222,85 @@ test('dry-run also applies to agentOverrides', () => {
       env: { SMART_DISPATCH_CONFIG: config, SMART_DISPATCH_DRY: '1' },
     })
     assert.deepEqual(r, {})
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// ── retry-escalation (self-healing downgrades) ────────────────────────────────
+// Two dispatches of the same task within the window: the first downgrades,
+// the second refuses to — and logs the correction.
+
+test('second dispatch of a downgraded task is not downgraded again (escalated)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const log = join(dir, 'log.jsonl')
+  const input = { subagent_type: 'Explore', description: 'find', prompt: 'find all usages of X' }
+  try {
+    const first = runHook({ tool_input: input, env: { SMART_DISPATCH_LOG: log } })
+    assert.equal(first.hookSpecificOutput.updatedInput.model, 'haiku', 'first dispatch downgrades')
+
+    const second = runHook({ tool_input: input, env: { SMART_DISPATCH_LOG: log } })
+    assert.deepEqual(second, {}, 'retry must NOT be downgraded again')
+
+    const lines = readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+    assert.equal(lines.length, 2)
+    assert.equal(lines[0].model, 'haiku')
+    assert.ok(lines[0].hash, 'routed decisions log their prompt hash')
+    assert.equal(lines[1].tier, 'Retry')
+    assert.equal(lines[1].model, 'opus')
+    assert.equal(lines[1].escalatedFrom, 'haiku')
+    assert.equal(lines[1].hash, lines[0].hash)
+    assert.equal(lines[1].agent, 'Explore')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('escalation never writes an explicit model — it withholds the downgrade', () => {
+  // The no-escalation invariant: even while self-healing, the hook must not
+  // force opus via updatedInput; it just leaves the call to the session default.
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const log = join(dir, 'log.jsonl')
+  const input = { subagent_type: 'Explore', description: 'find', prompt: 'find all usages of Y' }
+  try {
+    runHook({ tool_input: input, env: { SMART_DISPATCH_LOG: log } })
+    const second = runHook({ tool_input: input, env: { SMART_DISPATCH_LOG: log } })
+    assert.equal(second.hookSpecificOutput, undefined)
+    assert.deepEqual(second, {})
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a different task right after a downgrade is still downgraded (no false match)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const log = join(dir, 'log.jsonl')
+  try {
+    runHook({
+      tool_input: { subagent_type: 'Explore', description: 'find', prompt: 'find all usages of X' },
+      env: { SMART_DISPATCH_LOG: log },
+    })
+    const other = runHook({
+      tool_input: { subagent_type: 'Explore', description: 'find', prompt: 'find all usages of ZZZ' },
+      env: { SMART_DISPATCH_LOG: log },
+    })
+    assert.equal(other.hookSpecificOutput.updatedInput.model, 'haiku', 'different task → normal routing')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('SMART_DISPATCH_ESCALATION=0 disables self-healing', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const log = join(dir, 'log.jsonl')
+  const input = { subagent_type: 'Explore', description: 'find', prompt: 'find all usages of W' }
+  try {
+    runHook({ tool_input: input, env: { SMART_DISPATCH_LOG: log } })
+    const second = runHook({
+      tool_input: input,
+      env: { SMART_DISPATCH_LOG: log, SMART_DISPATCH_ESCALATION: '0' },
+    })
+    assert.equal(second.hookSpecificOutput.updatedInput.model, 'haiku', 'kill switch restores old behavior')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

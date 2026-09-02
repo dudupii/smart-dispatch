@@ -69,3 +69,21 @@ test('confident downgrade survives low budget (no escalation)', () => {
   // Trivial + confident → haiku; low budget must NOT escalate it back up.
   assert.equal(decideModel({ tier: 'Trivial', confidence: 0.9, budgetRemaining: 0.01 }).model, 'haiku')
 })
+
+// Config-injected thresholds (src/config.js) — same policy, user-tuned knobs.
+// Defaults must behave exactly like the exported constants.
+test('injected downgradeThreshold moves the bar for leaving opus', () => {
+  assert.equal(decideModel({ tier: 'Trivial', confidence: 0.7 }, { downgradeThreshold: 0.6 }).model, 'haiku')
+  assert.equal(decideModel({ tier: 'Trivial', confidence: 0.7 }).model, 'opus')
+})
+
+test('injected budgetFloor widens/narrows the opus step-down zone', () => {
+  assert.equal(
+    decideModel({ tier: 'Hard', confidence: 0.99, budgetRemaining: 0.05 }, { budgetFloor: 0.01 }).model,
+    'opus',
+  )
+  assert.equal(
+    decideModel({ tier: 'Hard', confidence: 0.99, budgetRemaining: 0.5 }, { budgetFloor: 0.6 }).model,
+    'sonnet',
+  )
+})

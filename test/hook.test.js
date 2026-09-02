@@ -11,7 +11,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -140,4 +140,43 @@ test('a logging failure never breaks the tool call', () => {
     env: { SMART_DISPATCH_LOG: '/no/such/dir/cannot/write/log.jsonl' },
   })
   assert.equal(r.hookSpecificOutput.updatedInput.model, 'haiku')
+})
+
+// ── config file (agentOverrides) ──────────────────────────────────────────────
+
+test('agentOverrides: fixed model applied verbatim, logged as an Override', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const log = join(dir, 'log.jsonl')
+  const config = join(dir, 'config.json')
+  writeFileSync(config, JSON.stringify({ agentOverrides: { 'my-finder': 'haiku' } }))
+  try {
+    const r = runHook({
+      // a prompt the heuristics would never downgrade — the override must win
+      tool_input: { subagent_type: 'my-finder', prompt: 'architect a distributed system from scratch' },
+      env: { SMART_DISPATCH_LOG: log, SMART_DISPATCH_CONFIG: config },
+    })
+    assert.equal(r.hookSpecificOutput.updatedInput.model, 'haiku')
+    const entry = JSON.parse(readFileSync(log, 'utf8').trim().split('\n').pop())
+    assert.equal(entry.tier, 'Override')
+    assert.equal(entry.model, 'haiku')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('agentOverrides: "never" disables routing for that type — no rewrite, no log', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-hook-'))
+  const log = join(dir, 'log.jsonl')
+  const config = join(dir, 'config.json')
+  writeFileSync(config, JSON.stringify({ agentOverrides: { 'Explore': 'never' } }))
+  try {
+    const r = runHook({
+      tool_input: { subagent_type: 'Explore', prompt: 'find foo' },
+      env: { SMART_DISPATCH_LOG: log, SMART_DISPATCH_CONFIG: config },
+    })
+    assert.deepEqual(r, {})
+    assert.ok(!existsSync(log), 'a skipped type is not a routing decision — nothing logged')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

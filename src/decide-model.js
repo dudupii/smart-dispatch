@@ -19,9 +19,14 @@ const TIER_MODEL = {
  * @param {string|null} [input.userOverride] - explicit model request, skips routing;
  *   passes through verbatim (not validated against the model set)
  * @param {number|null} [input.budgetRemaining] - 0..1 fraction of budget left
+ * @param {object} [config] - overrides from src/config.js (defaults = the
+ *   exported constants above; injecting keeps this function pure)
  * @returns {{model: 'haiku'|'sonnet'|'opus', downgraded: boolean, reason: string}}
  */
-export function decideModel({ tier, confidence = 0, userOverride = null, budgetRemaining = null } = {}) {
+export function decideModel(
+  { tier, confidence = 0, userOverride = null, budgetRemaining = null } = {},
+  { downgradeThreshold = DOWNGRADE_THRESHOLD, budgetFloor = BUDGET_FLOOR } = {},
+) {
   // 1. User always wins.
   if (userOverride) {
     return { model: userOverride, downgraded: false, reason: 'user override' }
@@ -36,7 +41,7 @@ export function decideModel({ tier, confidence = 0, userOverride = null, budgetR
   const safeConfidence = Number.isFinite(confidence) && confidence >= 0 ? confidence : 0
 
   // 4. Quality-first: leave opus ONLY when confidently trivial/routine.
-  const confident = safeConfidence >= DOWNGRADE_THRESHOLD
+  const confident = safeConfidence >= downgradeThreshold
   const downgradeable = (safeTier === 'Trivial' || safeTier === 'Routine') && confident
 
   const model = downgradeable ? TIER_MODEL[safeTier] : 'opus'
@@ -45,7 +50,7 @@ export function decideModel({ tier, confidence = 0, userOverride = null, budgetR
     : (safeTier === 'Hard' ? 'hard task' : 'uncertain → opus')
 
   // 5. Budget mode: the ONLY allowed downward override of opus.
-  if (model === 'opus' && budgetRemaining !== null && budgetRemaining < BUDGET_FLOOR) {
+  if (model === 'opus' && budgetRemaining !== null && budgetRemaining < budgetFloor) {
     return { model: 'sonnet', downgraded: true, reason: `budget low (${budgetRemaining}) → opus→sonnet` }
   }
 

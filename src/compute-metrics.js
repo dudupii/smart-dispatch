@@ -1,12 +1,21 @@
 // Compute quality + cost metrics from routing outcomes.
-// Relative token-cost weights (opus = 1.0). Approximate but consistent.
-const RELATIVE_COST = { haiku: 0.1, sonnet: 0.3, opus: 1.0 }
+//
+// Savings is an ESTIMATE based on relative token-cost weights (opus = 1.0).
+// The table is versioned and dated so a drifted estimate is visible in
+// report output ("price table v1, 2026-07-12") instead of silently wrong;
+// override it per-machine with `priceTable` in ~/.smart-dispatch/config.json.
+export const PRICE_TABLE = Object.freeze({
+  version: 1,
+  asOf: '2026-07-12',
+  relative: Object.freeze({ haiku: 0.1, sonnet: 0.3, opus: 1.0 }),
+})
 
 /**
  * @param {Array<{trueTier:'Trivial'|'Routine'|'Hard', chosenModel:'haiku'|'sonnet'|'opus'}>} outcomes
+ * @param {{relativeCost?: Object<string, number>}} [options]
  * @returns {{falseDowngradeRate:number|null, savingsRate:number|null, count:number}}
  */
-export function computeMetrics(outcomes) {
+export function computeMetrics(outcomes, { relativeCost = PRICE_TABLE.relative } = {}) {
   if (!Array.isArray(outcomes) || outcomes.length === 0) {
     return { falseDowngradeRate: null, savingsRate: null, count: 0 }
   }
@@ -21,10 +30,10 @@ export function computeMetrics(outcomes) {
 
   // Savings: actual cost vs all-opus baseline.
   const actualCost = outcomes.reduce(
-    (sum, o) => sum + (RELATIVE_COST[o.chosenModel] ?? 1.0),
+    (sum, o) => sum + (relativeCost[o.chosenModel] ?? 1.0),
     0
   )
-  const baselineCost = outcomes.length * RELATIVE_COST.opus
+  const baselineCost = outcomes.length * (relativeCost.opus ?? 1.0)
   // Round to 10 dp to absorb float artifacts (e.g. 1 - 1.1/2 = 0.4499...96 → 0.45),
   // so the metric compares cleanly without changing its meaning.
   const savingsRate = baselineCost > 0

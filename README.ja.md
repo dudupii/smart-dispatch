@@ -42,6 +42,14 @@ claude plugin install smart-dispatch@smart-dispatch
 
 > フックが使うのは保守的なヒューリスティクスです（読み取り専用の `Explore` タスクに加え、短くて読み取り専用／機械的な `general-purpose` プロンプト向けの狭いゲート）。ダウングレードが誤りだった場合、同じタスクの次のディスパッチはセッション既定のモデルへ**自己修復**されます——[オブザーバビリティ](#オブザーバビリティ)を参照。より高精度なルーティング（Haiku 分類器）には `/smart-dispatch` を明示的に呼び出してください——両経路は同じ `src/decide-model.js` ポリシーを共有し、同じログに書き込みます。`SMART_DISPATCH_DRY=1` を設定すると、呼び出しを書き換えずにログだけでルーティング決定をプレビューできます。
 
+## アップデート
+
+```bash
+claude plugin update smart-dispatch
+```
+
+**セッションを再起動すると適用されます**（フックの変更も含む）。バージョンが古いままに見える場合は、先にマーケットプレイスを更新（`claude plugin marketplace update smart-dispatch`）してから再度アップデートしてください。
+
 ## チューニングノブ
 
 チューニングは**ソース編集ではなくデータ**です。デフォルトは `src/decide-model.js`（唯一の信頼できる情報源）にあり、`~/.smart-dispatch/config.json`（パスは `SMART_DISPATCH_CONFIG`）または環境変数で上書きできます：

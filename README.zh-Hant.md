@@ -42,6 +42,14 @@ claude plugin install smart-dispatch@smart-dispatch
 
 > hook 用的是保守啟發式（唯讀的 `Explore` 任務，外加一個針對短小唯讀/機械式 `general-purpose` 提示的窄門）。如果降級被證明是錯的，同一任務的下一次派發會**自癒**回會話預設模型——見[可觀測性](#可觀測性)。若想要更高保真度的路由（用 Haiku 分類器），可明確呼叫 `/smart-dispatch`——兩條路共用同一份 `src/decide-model.js` 策略，寫入同一個日誌。設定 `SMART_DISPATCH_DRY=1` 可以只在日誌裡預覽路由決策，絕不改寫任何呼叫。
 
+## 更新
+
+```bash
+claude plugin update smart-dispatch
+```
+
+**重啟工作階段後生效**（含 hook 變更）。若版本號看起來沒變，先重新整理 marketplace（`claude plugin marketplace update smart-dispatch`）再更新一次。
+
 ## 可調參數
 
 調參是**資料，不是改原始碼**。預設值在 `src/decide-model.js`（唯一真相源），可透過 `~/.smart-dispatch/config.json`（路徑可用 `SMART_DISPATCH_CONFIG` 指定）或環境變數覆蓋：

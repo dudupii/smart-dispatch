@@ -42,6 +42,14 @@ Once installed, routing is **automatic and transparent**: a `PreToolUse` hook in
 
 > The hook uses conservative heuristics (read-only `Explore` tasks, plus a narrow gate for short read-only/mechanical `general-purpose` prompts). If a downgrade turns out to be wrong, the next dispatch of the same task is **self-healed** back to the session default — see [retry-escalation](#observability). For higher-fidelity routing with a Haiku classifier, invoke `/smart-dispatch` explicitly — both paths share the same `src/decide-model.js` policy and write to the same log. Set `SMART_DISPATCH_DRY=1` to preview routing decisions in the log without ever rewriting a call.
 
+## Update
+
+```bash
+claude plugin update smart-dispatch
+```
+
+**Restart the session to apply** (hook changes included). If the version looks stale, refresh the marketplace first (`claude plugin marketplace update smart-dispatch`), then update again.
+
 ## Tuning knobs
 
 Tuning is **data, not source edits**. Defaults live in `src/decide-model.js` (the single source of truth) and can be overridden by `~/.smart-dispatch/config.json` (path via `SMART_DISPATCH_CONFIG`) or env vars:

@@ -9,3 +9,6 @@ docs/plans/
 
 # external promotional post drafts (local only, not shipped)
 docs/promo/
+
+# local Playwright MCP session artifacts
+.playwright-mcp/

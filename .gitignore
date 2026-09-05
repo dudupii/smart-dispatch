@@ -7,6 +7,15 @@ node_modules/
 # internal planning/design docs (kept locally, not shipped)
 docs/plans/
 
+# local agent-skill config (CLAUDE.md Agent-skills block + docs/agents/), and
+# the domain docs they point at (CONTEXT.md / ADRs feed grill-with-docs,
+# domain-modeling etc.) — this is a public repo, keep all of it local
+CLAUDE.md
+docs/agents/
+CONTEXT.md
+CONTEXT-MAP.md
+docs/adr/
+
 # external promotional post drafts (local only, not shipped)
 docs/promo/
 

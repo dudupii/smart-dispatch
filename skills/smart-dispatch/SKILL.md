@@ -42,7 +42,7 @@ The router returns a `model` field of its own — **ignore it**. The policy re-d
    ```bash
    mkdir -p "${SMART_DISPATCH_LOG_DIR:-$HOME/.smart-dispatch}" && printf '{"ts":"%s","tier":"%s","confidence":%s,"model":"%s","hash":"%s","agent":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<tier>" "<confidence>" "<model>" "$(printf '%s' "<description> <prompt>" | tr -s '[:space:]' ' ' | sha256sum | cut -c1-10)" "<subagent_type>" >> "${SMART_DISPATCH_LOG:-$HOME/.smart-dispatch/log.jsonl}"
    ```
-   Users review aggregate stats with the `/smart-dispatch-report` command or `npm run report`.
+   Users review aggregate stats with the `/smart-dispatch:smart-dispatch-report` command or `npm run report`.
 6. **Execute.** Dispatch the real worker agent with the chosen model.
 
 ## Fallback

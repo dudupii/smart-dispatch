@@ -111,7 +111,7 @@ eval 報告兩個數字：
 隨時查看聚合統計：
 
 ```bash
-npm run report                    # 或在會話裡用 /smart-dispatch-report 命令
+npm run report                    # 或在會話裡用 /smart-dispatch:smart-dispatch-report 命令
 npm run report -- --today         # 只看今天
 npm run report -- --since 7d      # 最近 7 天（也支援 24h 或 2026-08-01）
 npm run report -- --json          # 機器可讀格式

@@ -111,7 +111,7 @@ eval は 2 つの数字を報告します：
 集計統計はいつでも確認できます：
 
 ```bash
-npm run report                    # またはセッション内で /smart-dispatch-report コマンド
+npm run report                    # またはセッション内で /smart-dispatch:smart-dispatch-report コマンド
 npm run report -- --today         # 今日のみ
 npm run report -- --since 7d      # 直近 7 日（24h や 2026-08-01 も可）
 npm run report -- --json          # 機械可読フォーマット

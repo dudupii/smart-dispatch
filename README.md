@@ -110,7 +110,7 @@ Every routing decision is shown inline (`smart-dispatch → haiku (Trivial, conf
 See aggregate stats anytime:
 
 ```bash
-npm run report                    # or the /smart-dispatch-report command in a session
+npm run report                    # or the /smart-dispatch:smart-dispatch-report command in a session
 npm run report -- --today         # today only
 npm run report -- --since 7d      # last 7 days (or 24h, or 2026-08-01)
 npm run report -- --json          # machine-readable

@@ -67,3 +67,22 @@ without acting.
 > The payload shapes this adapter handles cover both documented schemas. If
 > Codex changes them, the failure mode is a logged no-op — the hook never
 > blocks a spawn on its own errors.
+
+## Live spike (2 minutes, when you have network to OpenAI)
+
+Confirms which spawn schema your Codex build actually emits (veto vs rewrite
+mode) and that the hook fires:
+
+1. In a scratch dir, create `.codex/hooks.json` with a `PreToolUse` /
+   `"matcher": "Agent"` hook whose command is `node` on a tiny script that
+   appends stdin to a file and prints `{}`.
+2. From that dir: `codex exec --skip-git-repo-check --sandbox read-only "Use
+   a subagent (spawn_agent) to search this directory for json files and
+   report the filenames briefly."`
+3. Inspect the captured payload: if `tool_input` carries a `model` field,
+   rewrite mode is available (configure `codex.models`); if it only has
+   `task_name`/`message`/`fork_turns`, you are on metadata-hidden V2 — veto
+   mode with the tier agents is the path.
+4. Then install this adapter per the instructions above and re-run: the
+   shared log (`~/.smart-dispatch/log.jsonl`) should gain a `host: "codex"`
+   entry, and trivial spawns should get denied with the tier-agent reason.

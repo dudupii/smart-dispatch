@@ -98,6 +98,13 @@ eval 报告两个数字：
 
 发布的插件**零运行时依赖**——Anthropic SDK 仅作 dev 依赖，只被 eval harness 使用。
 
+## 跨端：Pi 与 Codex
+
+路由核心与宿主无关，适配器只做编组。所有宿主共享同一个路由日志（带 `host` 标签）、跨宿主的重试自愈、显式模型即覆盖规则和 dry-run。
+
+- **Pi** —— 作为 Pi 包安装：`pi install https://github.com/dudupii/smart-dispatch`。附带 skill 和逐提示词路由扩展。Pi 每会话一个模型，路由因此映射为逐提示词的会话切换：确信琐碎/例行的提示词本轮回撤到便宜模型，其余恢复会话基线；`/model` 或 Ctrl+P 会让路由永久让位（用户覆盖）。**永不选高于会话基线的模型**。
+- **Codex** —— [`codex/`](./codex/README.md) 里的 `PreToolUse` hook，双模式：**否决式**（默认多智能体 V2 下可用）以理由拒绝确信琐碎的 spawn，指明重派到预固定档位的 agent（`codex/agents/*.toml`）；**改写式**（元数据可见的 schema）在配置了 `codex.models` 时为继承型 spawn 写入档位模型。已按官方 hook 文档契约验证；尚未真机 spike。
+
 ## 专业模式：批量路由（预算自适应）
 
 `workflows/batch-route.js` 是一个用于批量处理 + 成本控制的 [Workflow](https://docs.claude.com/claude-code/workflows)。它套用相同的质量优先策略，**并增加**预算感知：当剩余预算低于 `BUDGET_FLOOR` 时，`opus` 任务降为 `sonnet`（唯一允许的 opus 向下覆盖）。把单个任务或任务数组作为 `args` 传入；它用 Haiku 给每个任务路由，再用选定的模型执行。

@@ -69,6 +69,7 @@ export function loadConfig({ env = process.env, configPath } = {}) {
     escalation: { ...DEFAULT_CONFIG.escalation },
     agentOverrides: {},
     priceTable: null,
+    codex: undefined,
     configPath: configPath || configFilePath(env),
   }
 
@@ -105,6 +106,16 @@ export function loadConfig({ env = process.env, configPath } = {}) {
         }
       }
       if (Object.keys(table).length === 3) config.priceTable = table // partial tables would skew savings
+    }
+    if (file.codex && typeof file.codex === 'object') {
+      const codex = {}
+      for (const [alias, id] of Object.entries(file.codex.models ?? {})) {
+        if (typeof id === 'string' && id.trim()) codex.models = { ...codex.models, [alias]: id.trim() }
+      }
+      for (const [alias, agent] of Object.entries(file.codex.agents ?? {})) {
+        if (typeof agent === 'string' && agent.trim()) codex.agents = { ...codex.agents, [alias]: agent.trim() }
+      }
+      config.codex = codex
     }
   }
 

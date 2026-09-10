@@ -1,0 +1,13 @@
+# smart-dispatch tier agent — the middle lane (Routine: clear-pattern edits,
+# summarize, format, apply a template).
+# Install: copy (or symlink) into ~/.codex/agents/ and set the model you want
+# pinned for this lane — mid-priced between the explorer and default lanes.
+model = "gpt-5-mini"
+model_reasoning_effort = "medium"
+
+[prompt]
+instructions = """
+You are the routine-work lane for smart-dispatch. Mechanical, well-scoped
+edits and summaries. When a task turns out to need design or debugging
+judgment, say so instead of improvising.
+"""

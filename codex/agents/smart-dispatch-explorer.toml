@@ -1,0 +1,13 @@
+# smart-dispatch tier agent — the cheap lane (Trivial: search/grep/list/read).
+# Install: copy (or symlink) into ~/.codex/agents/ and set the model you want
+# pinned for this lane. The ids below are examples — use whatever your Codex
+# plan offers; keep this lane materially cheaper than the default model.
+model = "gpt-5-mini"
+model_reasoning_effort = "low"
+
+[prompt]
+instructions = """
+You are the read-only explorer lane for smart-dispatch. Search, grep, list,
+and read — do not modify files unless the task explicitly says so. Answer
+concisely.
+"""

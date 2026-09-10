@@ -97,6 +97,13 @@ The eval reports two numbers:
 
 The shipped plugin has **zero runtime dependencies** — the Anthropic SDK is dev-only, used solely by the eval harness.
 
+## Cross-host: Pi and Codex
+
+The routing core is host-neutral; adapters only marshal. All hosts share one routing log (with a `host` tag), cross-host retry self-healing, the explicit-model override rule, and dry-run.
+
+- **Pi** — install as a Pi package: `pi install https://github.com/dudupii/smart-dispatch`. Ships the skill plus a per-prompt routing extension. Pi runs one model per session, so routing maps to per-prompt session switches: a confidently trivial/routine prompt steps the session down for that loop, everything else restores the session base, and `/model` or Ctrl+P stands routing down permanently (user override). Never selects above your session's base model.
+- **Codex** — a `PreToolUse` hook in [`codex/`](./codex/README.md) with two modes: **veto** (works under default multi-agent V2) denies confidently-trivial spawns with a reason naming a pre-pinned tier agent (`codex/agents/*.toml`); **rewrite** (metadata-visible schema) writes the tier's model id on inherit-spawns when you configure `codex.models`. Verified against the documented hook contract; not yet live-spiked.
+
 ## Pro mode: batch routing (budget-adaptive)
 
 `workflows/batch-route.js` is a [Workflow](https://docs.claude.com/claude-code/workflows) for batch processing with cost control. It applies the same quality-first policy **plus** budget awareness: when remaining budget drops below `BUDGET_FLOOR`, `opus` tasks step down to `sonnet` (the only allowed downward override of opus). Hand it a task or an array of tasks as `args`; it routes each with Haiku, then executes each on the chosen model.

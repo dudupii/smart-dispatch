@@ -154,7 +154,8 @@ test('every routed decision is appended to the shared log', () => {
     const lines = readFileSync(log, 'utf8').trim().split('\n')
     assert.ok(lines.length >= 1, 'at least one decision logged')
     const entry = JSON.parse(lines[lines.length - 1])
-    assert.ok(['ts', 'tier', 'confidence', 'model'].every((k) => k in entry))
+    assert.ok(['ts', 'tier', 'confidence', 'model', 'host'].every((k) => k in entry))
+    assert.equal(entry.host, 'claude-code')
     assert.ok(['haiku', 'sonnet', 'opus'].includes(entry.model))
   } finally {
     rmSync(dir, { recursive: true, force: true })

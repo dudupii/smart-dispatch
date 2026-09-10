@@ -7,7 +7,7 @@ description: Quality-first automatic model routing. Before dispatching a sub-age
 
 You are about to dispatch a sub-agent. Pick the right model first — do not just default to something.
 
-## Policy (source of truth: `src/decide-model.js` — keep in sync)
+## Policy (defaults; in a clone of the repo, `src/decide-model.js` is the executable source of truth — keep in sync)
 
 - **Default: opus.** Quality first.
 - **Downgrade ONLY when** `tier ∈ {Trivial, Routine}` AND `confidence ≥ 0.8`:
@@ -23,7 +23,7 @@ The router returns a `model` field of its own — **ignore it**. The policy re-d
 ## Steps
 
 1. **Override check.** If the user explicitly named a model (or dispatched to a pinned agent) → use it. Stop here.
-2. **Retry check (self-healing).** If this is a re-dispatch of a task that was routed below opus in the last ~10 minutes (by you or by the hook), choose **opus** this time — the previous downgrade didn't stick. Log it as tier `Retry` with `escalatedFrom: "<previous model>"` and stop.
+2. **Retry check (self-healing).** Tail the shared routing log (`tail` the file at `$SMART_DISPATCH_LOG` or `~/.smart-dispatch/log.jsonl`) and look for an entry from the last ~10 minutes whose `hash` matches this task's (step 5 defines the hash). If such an entry routed below opus, this re-dispatch says the downgrade didn't stick → choose **opus** this time. Log it as tier `Retry` with `escalatedFrom: "<previous model>"` and stop.
 3. **Route.** Dispatch a classifier agent with `model: "haiku"`, asking for structured output only:
    ```json
    {"tier":"Trivial"|"Routine"|"Hard","model":"haiku"|"sonnet"|"opus","confidence":0..1,"reason":"..."}
@@ -38,7 +38,7 @@ The router returns a `model` field of its own — **ignore it**. The policy re-d
    ```
    smart-dispatch → <model> (<tier>, conf <confidence>)
    ```
-   Then append a record to the shared routing log (best-effort — **routing metadata only, never the task text**; `hash` is a one-way digest of the task used for retry matching; `host` tags which agent dispatched it):
+   Then append a record to the shared routing log (best-effort — **routing metadata only, never the task text**; `hash` is a one-way digest of the task used for retry matching; `host` tags which agent dispatched it, one of `claude-code` / `pi` / `codex`):
    ```bash
    mkdir -p "${SMART_DISPATCH_LOG_DIR:-$HOME/.smart-dispatch}" && printf '{"ts":"%s","tier":"%s","confidence":%s,"model":"%s","hash":"%s","agent":"%s","host":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<tier>" "<confidence>" "<model>" "$(printf '%s' "<description> <prompt>" | tr -s '[:space:]' ' ' | sha256sum | cut -c1-10)" "<subagent_type>" "<host>" >> "${SMART_DISPATCH_LOG:-$HOME/.smart-dispatch/log.jsonl}"
    ```

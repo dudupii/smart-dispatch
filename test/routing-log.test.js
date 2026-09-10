@@ -77,6 +77,15 @@ test('summarizeEntries: byTier / byAgent / escalations', () => {
   assert.equal(s.escalations, 1)
 })
 
+test('summarizeEntries: byHost groups entries across hosts', () => {
+  const s = summarizeEntries([
+    { tier: 'Trivial', model: 'haiku', host: 'claude-code' },
+    { tier: 'Hard', model: 'opus', host: 'pi' },
+    { tier: 'Hard', model: 'opus' }, // legacy entry without host
+  ])
+  assert.deepEqual(s.byHost, { 'claude-code': 1, pi: 1 })
+})
+
 test('summarizeEntries: relativeCost override changes the savings estimate', () => {
   const entries = [{ tier: 'Trivial', model: 'haiku' }, { tier: 'Hard', model: 'opus' }]
   const stock = summarizeEntries(entries)

@@ -17,7 +17,9 @@ const TIER_MODEL = {
  * @param {'Trivial'|'Routine'|'Hard'|'Unknown'} [input.tier]
  * @param {number} [input.confidence] - 0..1
  * @param {string|null} [input.userOverride] - explicit model request, skips routing;
- *   passes through verbatim (not validated against the model set)
+ *   passes through verbatim (not validated against the model set). Pinned-agent
+ *   overrides (config agentOverrides, Codex custom-agent pins) are resolved at
+ *   the host-adapter layer before this policy is consulted — same semantics.
  * @param {number|null} [input.budgetRemaining] - 0..1 fraction of budget left
  * @param {object} [config] - overrides from src/config.js (defaults = the
  *   exported constants above; injecting keeps this function pure)

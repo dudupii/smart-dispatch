@@ -1,8 +1,9 @@
 // Parse and summarize the smart-dispatch routing log.
 // Log lines are JSON:
-//   {"ts":"...","tier":"Trivial","confidence":0.92,"model":"haiku",
-//    "hash":"ab12...","agent":"Explore","escalatedFrom":"haiku"}   (all optional)
+//   {"ts":"...","tier":"Trivial","confidence":0.92,"model":"haiku","host":"claude-code",
+//    "hash":"ab12...","agent":"Explore","escalatedFrom":"haiku"}   (all optional but ts/model)
 // `hash` is a one-way digest of the task text — the text itself is never logged.
+// `host` names the dispatching agent: claude-code | pi | codex.
 import { computeMetrics } from './compute-metrics.js'
 
 /**
@@ -73,6 +74,7 @@ export function summarizeEntries(entries, { relativeCost } = {}) {
     byModel: countBy(entries, 'model'),
     byTier: countBy(entries, 'tier'),
     byAgent: countBy(entries, 'agent'),
+    byHost: countBy(entries, 'host'),
     escalations: entries.filter((e) => e && typeof e.escalatedFrom === 'string').length,
     savingsRate: metrics.savingsRate,
     hardDowngraded: metrics.falseDowngradeRate,

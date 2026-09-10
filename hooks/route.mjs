@@ -42,9 +42,10 @@ function logPath() {
 }
 
 function logDecision({ tier, confidence, model, hash = null, escalatedFrom = null, agent = null }) {
-  // Best-effort, same shape as skills/smart-dispatch/SKILL.md step 4.
+  // Best-effort, same shape as skills/smart-dispatch/SKILL.md step 5.
   // `hash` is a one-way digest of the task text (never the text itself);
-  // `agent` is the subagent_type; `escalatedFrom` marks a self-healed retry.
+  // `agent` is the subagent_type; `escalatedFrom` marks a self-healed retry;
+  // `host` identifies the dispatching agent (claude-code / pi / codex).
   try {
     mkdirSync(dirname(logPath()), { recursive: true })
     appendFileSync(
@@ -54,6 +55,7 @@ function logDecision({ tier, confidence, model, hash = null, escalatedFrom = nul
         tier,
         confidence,
         model,
+        host: 'claude-code',
         ...(hash ? { hash } : {}),
         ...(escalatedFrom ? { escalatedFrom } : {}),
         ...(agent ? { agent } : {}),

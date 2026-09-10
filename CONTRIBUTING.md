@@ -12,7 +12,7 @@ Thanks for considering a contribution! smart-dispatch is a small, deliberately f
 git clone https://github.com/dudupii/smart-dispatch
 cd smart-dispatch
 npm install      # dev deps only (@anthropic-ai/sdk)
-npm test         # 41 tests, should be green
+npm test         # full suite, should be green
 ```
 
 Requires Node ≥ 18 (CI runs 22 and 24).

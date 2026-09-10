@@ -9,8 +9,14 @@
     "report": "node scripts/report.mjs"
   },
   "license": "MIT",
+  "keywords": [
+    "pi-package"
+  ],
   "private": true,
   "pi": {
+    "extensions": [
+      "./extensions/smart-dispatch/"
+    ],
     "skills": [
       "./skills/"
     ]

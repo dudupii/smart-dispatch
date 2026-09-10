@@ -53,10 +53,12 @@ test('SKILL.md is host-neutral: host specifics live in a trailing Host notes sec
   }
 })
 
-test('package.json ships the shared skills to Pi and stays private', () => {
+test('package.json ships the shared skills + extension to Pi and stays private', () => {
   const pkg = JSON.parse(read('../package.json'))
   assert.equal(pkg.private, true, 'private + git installs (no npm publishing)')
   assert.deepEqual(pkg.pi?.skills, ['./skills/'], 'pi field points at the shared skills dir')
+  assert.ok(pkg.pi?.extensions?.includes('./extensions/smart-dispatch/'), 'pi field ships the extension')
+  assert.ok(pkg.keywords?.includes('pi-package'), 'gallery-discoverable keyword')
 })
 
 test('SKILL.md policy numbers match the code (no drift)', () => {

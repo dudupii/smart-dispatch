@@ -4,7 +4,63 @@
 //    "hash":"ab12...","agent":"Explore","escalatedFrom":"haiku"}   (all optional but ts/model)
 // `hash` is a one-way digest of the task text — the text itself is never logged.
 // `host` names the dispatching agent: claude-code | pi | codex.
+
+import { appendFileSync, closeSync, mkdirSync, openSync, readSync, statSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { computeMetrics } from './compute-metrics.js'
+
+/**
+ * Best-effort append of one routing entry. Never throws — logging must not
+ * break a dispatch. Same shape as skills/smart-dispatch/SKILL.md step 5.
+ * @param {string} logPath
+ * @param {{tier: string, confidence: number, model: string, host?: string,
+ *   hash?: string|null, escalatedFrom?: string|null, agent?: string|null}} entry
+ */
+export function appendLogEntry(logPath, entry) {
+  try {
+    const { tier, confidence, model, hash = null, escalatedFrom = null, agent = null, host = null } = entry ?? {}
+    mkdirSync(dirname(logPath), { recursive: true })
+    appendFileSync(
+      logPath,
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        tier,
+        confidence,
+        model,
+        ...(host ? { host } : {}),
+        ...(hash ? { hash } : {}),
+        ...(escalatedFrom ? { escalatedFrom } : {}),
+        ...(agent ? { agent } : {}),
+      }) + '\n',
+    )
+  } catch {
+    // never break the tool call over logging
+  }
+}
+
+/**
+ * Read only the tail of the log — enough history for retry matching without
+ * paying full-file I/O on every dispatch. A truncated first line simply fails
+ * JSON.parse and is skipped by parseLog. Returns [] when unreadable.
+ * @param {string} path
+ * @param {number} [maxBytes]
+ */
+export function readLogTail(path, maxBytes = 65536) {
+  try {
+    const { size } = statSync(path)
+    const len = Math.min(size, maxBytes)
+    const buf = Buffer.alloc(len)
+    const fd = openSync(path, 'r')
+    try {
+      readSync(fd, buf, 0, len, size - len)
+    } finally {
+      closeSync(fd)
+    }
+    return parseLog(buf.toString('utf8'))
+  } catch {
+    return [] // missing/unreadable log → nothing to escalate from
+  }
+}
 
 /**
  * Parse JSONL log text into entries, skipping blank/malformed lines and

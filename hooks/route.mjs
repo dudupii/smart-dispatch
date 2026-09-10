@@ -14,10 +14,9 @@
 
 import { routeDispatch } from '../src/dispatch-pipeline.js'
 import { loadConfig } from '../src/config.js'
-import { parseLog } from '../src/routing-log.js'
-import { appendFileSync, closeSync, mkdirSync, openSync, readSync, statSync } from 'node:fs'
+import { appendLogEntry, readLogTail } from '../src/routing-log.js'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -30,51 +29,6 @@ function readStdin() {
 
 function logPath() {
   return process.env.SMART_DISPATCH_LOG || join(homedir(), '.smart-dispatch', 'log.jsonl')
-}
-
-// Best-effort log writer — same shape as skills/smart-dispatch/SKILL.md step 5.
-// `hash` is a one-way digest of the task text (never the text itself);
-// `agent` is the subagent type; `escalatedFrom` marks a self-healed retry;
-// `host` identifies the dispatching agent (claude-code / pi / codex).
-function writeLogEntry({ tier, confidence, model, hash = null, escalatedFrom = null, agent = null, host = 'claude-code' }) {
-  try {
-    mkdirSync(dirname(logPath()), { recursive: true })
-    appendFileSync(
-      logPath(),
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        tier,
-        confidence,
-        model,
-        host,
-        ...(hash ? { hash } : {}),
-        ...(escalatedFrom ? { escalatedFrom } : {}),
-        ...(agent ? { agent } : {}),
-      }) + '\n',
-    )
-  } catch {
-    // never break the tool call over logging
-  }
-}
-
-// Read only the tail of the log — enough history for retry matching without
-// paying full-file I/O on every Agent call. A truncated first line simply
-// fails JSON.parse and is skipped by parseLog.
-function readLogTail(path, maxBytes = 65536) {
-  try {
-    const { size } = statSync(path)
-    const len = Math.min(size, maxBytes)
-    const buf = Buffer.alloc(len)
-    const fd = openSync(path, 'r')
-    try {
-      readSync(fd, buf, 0, len, size - len)
-    } finally {
-      closeSync(fd)
-    }
-    return parseLog(buf.toString('utf8'))
-  } catch {
-    return [] // missing/unreadable log → nothing to escalate from
-  }
 }
 
 function emitEmpty() {
@@ -114,7 +68,7 @@ async function main() {
     {
       config,
       entries: () => readLogTail(logPath()), // lazy — skipped unless escalation needs it
-      logEntry: writeLogEntry,
+      logEntry: (entry) => appendLogEntry(logPath(), entry),
     },
   )
 

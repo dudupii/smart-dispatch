@@ -37,6 +37,28 @@ test('SKILL.md has name + description frontmatter', () => {
   assert.match(frontmatter, /description:/)
 })
 
+test('SKILL.md is host-neutral: host specifics live in a trailing Host notes section', () => {
+  const skill = read('../skills/smart-dispatch/SKILL.md')
+  const hostNotes = skill.indexOf('## Host notes')
+  assert.ok(hostNotes > 0, 'SKILL.md must have a Host notes section')
+  const body = skill.slice(0, hostNotes)
+  // The namespaced command and the Claude Code tool name are host specifics —
+  // they belong in Host notes, not in the host-neutral body.
+  assert.ok(!body.includes('/smart-dispatch:smart-dispatch-report'))
+  assert.ok(!body.includes('Agent/Task'), 'body should speak of dispatch generically')
+  // Host notes must cover all three hosts so the same file ships everywhere.
+  const notes = skill.slice(hostNotes)
+  for (const host of ['Claude Code', 'Pi', 'Codex']) {
+    assert.ok(notes.includes(host), `Host notes must mention ${host}`)
+  }
+})
+
+test('package.json ships the shared skills to Pi and stays private', () => {
+  const pkg = JSON.parse(read('../package.json'))
+  assert.equal(pkg.private, true, 'private + git installs (no npm publishing)')
+  assert.deepEqual(pkg.pi?.skills, ['./skills/'], 'pi field points at the shared skills dir')
+})
+
 test('SKILL.md policy numbers match the code (no drift)', () => {
   const skill = read('../skills/smart-dispatch/SKILL.md')
   assert.ok(

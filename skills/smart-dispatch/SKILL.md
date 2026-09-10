@@ -1,11 +1,11 @@
 ---
 name: smart-dispatch
-description: Quality-first automatic model routing. Before dispatching a sub-agent, classify the task with a cheap model and pick opus by default — downgrade only when confidently trivial/routine. Trigger when about to call the Agent/Task tool to dispatch a task.
+description: Quality-first automatic model routing. Before dispatching a sub-agent, classify the task with a cheap model and pick opus by default — downgrade only when confidently trivial/routine. Trigger when about to dispatch a task to a sub-agent.
 ---
 
 # smart-dispatch
 
-You are about to dispatch a sub-agent via the Agent/Task tool. Pick the right model first — do not just default to something.
+You are about to dispatch a sub-agent. Pick the right model first — do not just default to something.
 
 ## Policy (source of truth: `src/decide-model.js` — keep in sync)
 
@@ -14,7 +14,7 @@ You are about to dispatch a sub-agent via the Agent/Task tool. Pick the right mo
   - Trivial → `haiku`
   - Routine → `sonnet`
 - **Everything else → opus**, including any uncertainty, low/non-finite confidence, or parse failure.
-- **User override wins**: if the user named a model, use it verbatim and skip routing.
+- **User override wins**: if the user named a model (or pinned an agent with a fixed model), use it verbatim and skip routing.
 - **Budget mode** (Workflow pro mode only): if remaining budget < 0.1, opus may step down to sonnet. This is the only allowed downward override of opus; it never escalates an already-downgraded task.
 - The numbers above are defaults — the user's config (`~/.smart-dispatch/config.json`, or `SMART_DISPATCH_THRESHOLD` env) may override the threshold. Honor a configured value if you can read one; otherwise use these defaults.
 
@@ -22,7 +22,7 @@ The router returns a `model` field of its own — **ignore it**. The policy re-d
 
 ## Steps
 
-1. **Override check.** If the user explicitly named a model → use it. Stop here.
+1. **Override check.** If the user explicitly named a model (or dispatched to a pinned agent) → use it. Stop here.
 2. **Retry check (self-healing).** If this is a re-dispatch of a task that was routed below opus in the last ~10 minutes (by you or by the hook), choose **opus** this time — the previous downgrade didn't stick. Log it as tier `Retry` with `escalatedFrom: "<previous model>"` and stop.
 3. **Route.** Dispatch a classifier agent with `model: "haiku"`, asking for structured output only:
    ```json
@@ -38,13 +38,21 @@ The router returns a `model` field of its own — **ignore it**. The policy re-d
    ```
    smart-dispatch → <model> (<tier>, conf <confidence>)
    ```
-   Then append a record to the routing log (best-effort — **routing metadata only, never the task text**; `hash` is a one-way digest of the task used for retry matching):
+   Then append a record to the shared routing log (best-effort — **routing metadata only, never the task text**; `hash` is a one-way digest of the task used for retry matching; `host` tags which agent dispatched it):
    ```bash
-   mkdir -p "${SMART_DISPATCH_LOG_DIR:-$HOME/.smart-dispatch}" && printf '{"ts":"%s","tier":"%s","confidence":%s,"model":"%s","hash":"%s","agent":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<tier>" "<confidence>" "<model>" "$(printf '%s' "<description> <prompt>" | tr -s '[:space:]' ' ' | sha256sum | cut -c1-10)" "<subagent_type>" >> "${SMART_DISPATCH_LOG:-$HOME/.smart-dispatch/log.jsonl}"
+   mkdir -p "${SMART_DISPATCH_LOG_DIR:-$HOME/.smart-dispatch}" && printf '{"ts":"%s","tier":"%s","confidence":%s,"model":"%s","hash":"%s","agent":"%s","host":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<tier>" "<confidence>" "<model>" "$(printf '%s' "<description> <prompt>" | tr -s '[:space:]' ' ' | sha256sum | cut -c1-10)" "<subagent_type>" "<host>" >> "${SMART_DISPATCH_LOG:-$HOME/.smart-dispatch/log.jsonl}"
    ```
-   Users review aggregate stats with the `/smart-dispatch:smart-dispatch-report` command or `npm run report`.
+   Users review aggregate stats with the report command (see Host notes) or `npm run report`.
 6. **Execute.** Dispatch the real worker agent with the chosen model.
 
 ## Fallback
 
 Any error, ambiguity, or low confidence → **opus**. Never lose quality to a routing mistake. The only acceptable misjudgment direction is treating a simple task as hard (a little wasted spend) — never the reverse.
+
+## Host notes
+
+The policy above is host-neutral. Host-specific dispatch mechanics and commands:
+
+- **Claude Code** — dispatch happens via the `Agent` tool. A `PreToolUse` hook performs this routing automatically for every dispatch; this skill is the explicit, higher-fidelity path. Report: `/smart-dispatch:smart-dispatch-report` (or `npm run report`).
+- **Pi** — skills are installed from this repo via the `pi` packaging field. Until a native Pi extension ships, this skill is the routing path: follow the steps above before dispatching. Report: `npm run report` from a clone of this repo.
+- **Codex** — dispatch happens via `spawn_agent`. A spawn to a user-pinned custom agent counts as an override: skip routing entirely. Until a native Codex adapter ships, this skill is the routing path. Report: `npm run report` from a clone of this repo.

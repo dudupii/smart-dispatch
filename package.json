@@ -9,6 +9,12 @@
     "report": "node scripts/report.mjs"
   },
   "license": "MIT",
+  "private": true,
+  "pi": {
+    "skills": [
+      "./skills/"
+    ]
+  },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.122.0"
   }

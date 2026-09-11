@@ -8,15 +8,16 @@ import { parseRouterOutput } from '../src/parse-router-output.js'
 import { decideModel } from '../src/decide-model.js'
 import { computeMetrics } from '../src/compute-metrics.js'
 
-// Haiku 4.5. Verify the current id via the claude-api skill if this stops resolving.
+// Haiku 4.5 — the light tier's wire id. Verify via the claude-api skill if
+// this stops resolving.
 const ROUTER_MODEL = 'claude-haiku-4-5-20251001'
 
 const ROUTER_PROMPT = `You are a task-difficulty classifier for an AI coding agent. Read the task and output ONLY a JSON object, nothing else:
-{"tier":"Trivial"|"Routine"|"Hard","model":"haiku"|"sonnet"|"opus","confidence":0.0-1.0,"reason":"one short phrase"}
+{"tier":"Trivial"|"Routine"|"Hard","model":"light"|"mid"|"heavy","confidence":0.0-1.0,"reason":"one short phrase"}
 
-- Trivial: pure search, grep, read a config, list files, string lookup  → haiku
-- Routine: clear-pattern edit, summarize known content, format, apply a template → sonnet
-- Hard: reasoning, design, debug, multi-file logic, new code, architecture → opus
+- Trivial: pure search, grep, read a config, list files, string lookup  → light
+- Routine: clear-pattern edit, summarize known content, format, apply a template → mid
+- Hard: reasoning, design, debug, multi-file logic, new code, architecture → heavy
 When unsure, pick Hard and lower the confidence.`
 
 const dataset = JSON.parse(readFileSync(new URL('./dataset.json', import.meta.url)))
@@ -40,13 +41,13 @@ for (const [i, item] of dataset.entries()) {
   } catch (err) {
     console.error(`[${i + 1}/${dataset.length}] router error: ${err.message}`)
   }
-  // decideModel owns the opus fallback: null tier → Unknown → opus.
+  // decideModel owns the heavy fallback: null tier → Unknown → heavy.
   const { model: chosen } = decideModel({
     tier: parsed?.tier ?? null,
     confidence: parsed?.confidence,
   })
   outcomes.push({ trueTier: item.expectedTier, chosenModel: chosen })
-  const flag = item.expectedTier === 'Hard' && chosen !== 'opus' ? '  ⚠ FALSE-DOWNGRADE' : ''
+  const flag = item.expectedTier === 'Hard' && chosen !== 'heavy' ? '  ⚠ FALSE-DOWNGRADE' : ''
   console.error(`[${i + 1}/${dataset.length}] ${item.expectedTier.padEnd(8)} → ${chosen}${flag}`)
 }
 

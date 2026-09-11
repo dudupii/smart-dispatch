@@ -71,7 +71,7 @@ test('veto-mode decision is logged with host codex', () => {
   const log = join(tmpRoot, `log-${runCount}.jsonl`)
   const entry = JSON.parse(readFileSync(log, 'utf8').trim().split('\n').pop())
   assert.equal(entry.host, 'codex')
-  assert.equal(entry.model, 'haiku')
+  assert.equal(entry.model, 'light')
 })
 
 // ── rewrite mode (writable model field + configured tier→model ids) ─────────
@@ -79,7 +79,7 @@ test('veto-mode decision is logged with host codex', () => {
 test('inherit spawn (no model named) + configured mapping is rewritten in place', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sd-codex-cfg-'))
   const config = join(dir, 'config.json')
-  writeFileSync(config, JSON.stringify({ codex: { models: { haiku: 'gpt-5-mini-codex' } } }))
+  writeFileSync(config, JSON.stringify({ codex: { models: { light: 'gpt-5-mini-codex' } } }))
   try {
     const r = runHook({
       tool_input: {
@@ -94,6 +94,25 @@ test('inherit spawn (no model named) + configured mapping is rewritten in place'
     assert.equal(r.hookSpecificOutput.updatedInput.model, 'gpt-5-mini-codex')
     assert.equal(r.hookSpecificOutput.updatedInput.reasoning_effort, 'high', 'only the model is added')
     assert.equal(r.hookSpecificOutput.updatedInput.task_name, 'find-json', 'rest of the spawn preserved')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('codex.models legacy vocabulary keys still map (canonicalized at load)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sd-codex-cfg-'))
+  const config = join(dir, 'config.json')
+  writeFileSync(config, JSON.stringify({ codex: { models: { haiku: 'gpt-5-mini' } } })) // pre-v0.5.0 key
+  try {
+    const r = runHook({
+      tool_input: {
+        agent_type: 'general-purpose',
+        task_name: 'find-json',
+        message: 'Search the repo for all JSON files and list their paths',
+      },
+      env: { SMART_DISPATCH_CONFIG: config },
+    })
+    assert.equal(r.hookSpecificOutput.updatedInput.model, 'gpt-5-mini')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

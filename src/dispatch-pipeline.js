@@ -17,7 +17,7 @@
 import { classifyHeuristic } from './classify-heuristic.js'
 import { decideModel } from './decide-model.js'
 import { hashPrompt, shouldEscalate } from './escalation.js'
-import { resolveModel } from './model-registry.js'
+import { canonicalSlot, resolveModel } from './model-registry.js'
 
 const DEFAULT_ESCALATION = { enabled: true, windowMinutes: 10 }
 
@@ -35,21 +35,24 @@ export function routeDispatch(call, { config = {}, entries = [], nowMs = Date.no
 
   // 2. Config-pinned agents. "never" opts the type out entirely (not a
   //    routing decision); a fixed model is written explicitly like an
-  //    override — that is what the user configured.
+  //    override — that is what the user configured. Legacy slot aliases
+  //    canonicalize here so the log speaks one vocabulary; concrete ids
+  //    pass through untouched.
   const override = config.agentOverrides?.[subagentType]
   if (override === 'never') {
     return { model: null, rewrite: null, downgraded: false, escalatedFrom: null, reason: 'agent override: never' }
   }
   if (override) {
-    log({ tier: 'Override', confidence: 1, model: override, agent: subagentType, host })
-    return { model: override, rewrite: override, downgraded: false, escalatedFrom: null, reason: 'agent override' }
+    const slot = canonicalSlot(override)
+    log({ tier: 'Override', confidence: 1, model: slot, agent: subagentType, host })
+    return { model: slot, rewrite: slot, downgraded: false, escalatedFrom: null, reason: 'agent override' }
   }
 
   // 3. Classify with the conservative heuristics (the explicitModel skip
   //    case is unreachable — step 1 already returned).
   const h = classifyHeuristic({ subagent_type: subagentType, prompt, description })
 
-  // 4. Self-healing: a re-dispatch of a task we routed below opus recently.
+  // 4. Self-healing: a re-dispatch of a task we routed below heavy recently.
   const hash = hashPrompt({ prompt, description })
   const escalation = { ...DEFAULT_ESCALATION, ...(config.escalation ?? {}) }
   if (hash && escalation.enabled) {
@@ -59,13 +62,13 @@ export function routeDispatch(call, { config = {}, entries = [], nowMs = Date.no
       log({
         tier: 'Retry',
         confidence: h.confidence ?? 0,
-        model: 'opus',
+        model: 'heavy',
         hash,
         escalatedFrom: prior.fromModel,
         agent: subagentType,
         host,
       })
-      return { model: 'opus', rewrite: null, downgraded: false, escalatedFrom: prior.fromModel, reason: 'retry → withhold downgrade' }
+      return { model: 'heavy', rewrite: null, downgraded: false, escalatedFrom: prior.fromModel, reason: 'retry → withhold downgrade' }
     }
   }
 

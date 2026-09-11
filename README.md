@@ -19,15 +19,17 @@ Most "model routers" optimize for cost and quietly drop quality on hard tasks. s
 Before dispatching a sub-agent, smart-dispatch:
 
 1. Classifies the task with a **cheap model** (Haiku) → `{tier, confidence}`.
-2. Applies a **quality-first policy**: default `opus`; downgrade only when `tier ∈ {Trivial, Routine}` AND `confidence ≥ 0.8`.
-3. Dispatches the worker with the chosen model.
+2. Applies a **quality-first policy**: default `heavy`; downgrade only when `tier ∈ {Trivial, Routine}` AND `confidence ≥ 0.8`.
+3. Dispatches the worker on the chosen slot's model.
 
-| Tier | Example | Model |
+| Tier | Example | Slot |
 |------|---------|-------|
-| Trivial | grep, list files, read config | haiku |
-| Routine | clear-pattern edit, summarize, format | sonnet |
-| Hard | design, debug, new code, architecture | opus |
-| uncertain | anything fuzzy | opus (fallback) |
+| Trivial | grep, list files, read config | light |
+| Routine | clear-pattern edit, summarize, format | mid |
+| Hard | design, debug, new code, architecture | heavy |
+| uncertain | anything fuzzy | heavy (fallback) |
+
+Model names are host-neutral **slots** — `light` / `mid` / `heavy`. Each host resolves them to its own models: on Claude Code `light→haiku`, `mid→sonnet`, `heavy→opus`; on Codex your `codex.models` config decides; on Pi your current provider's lineup. The pre-v0.5.0 names (`haiku`/`sonnet`/`opus`) remain legal synonyms in config and old logs.
 
 The router's own `model` suggestion is **ignored** — the policy re-derives the choice from `tier` + `confidence` alone.
 
@@ -59,13 +61,13 @@ Tuning is **data, not source edits**. Defaults live in `src/decide-model.js` (th
   "downgradeThreshold": 0.8,
   "budgetFloor": 0.1,
   "escalation": { "enabled": true, "windowMinutes": 10 },
-  "agentOverrides": { "my-file-finder": "haiku", "my-careful-agent": "never" },
-  "priceTable": { "haiku": 0.1, "sonnet": 0.3, "opus": 1.0 }
+  "agentOverrides": { "my-file-finder": "light", "my-careful-agent": "never" },
+  "priceTable": { "light": 0.1, "mid": 0.3, "heavy": 1.0 }
 }
 ```
 
-- **`downgradeThreshold`** (default `0.8`, env `SMART_DISPATCH_THRESHOLD`) — the confidence required to leave opus. Raise for more conservative routing (closer to all-opus); lower to downgrade more aggressively.
-- **`budgetFloor`** (default `0.1`, env `SMART_DISPATCH_BUDGET_FLOOR`) — only relevant to budget mode (the Workflow pro mode, `workflows/batch-route.js`): when remaining budget drops below this fraction, opus steps down to sonnet. Never escalates an already-downgraded task.
+- **`downgradeThreshold`** (default `0.8`, env `SMART_DISPATCH_THRESHOLD`) — the confidence required to leave heavy. Raise for more conservative routing (closer to all-heavy); lower to downgrade more aggressively.
+- **`budgetFloor`** (default `0.1`, env `SMART_DISPATCH_BUDGET_FLOOR`) — only relevant to budget mode (the Workflow pro mode, `workflows/batch-route.js`): when remaining budget drops below this fraction, heavy steps down to mid. Never escalates an already-downgraded task.
 - **`escalation`** (env kill switch `SMART_DISPATCH_ESCALATION=0`) — self-healing window for re-dispatched tasks that were downgraded.
 - **`agentOverrides`** — a fixed model per subagent type (applied verbatim, like a user override), or `"never"` to leave that type untouched.
 - **Router model** — default Haiku (configured in `eval/run-eval.js`). If eval shows false-downgrades, raise to Sonnet.
@@ -80,8 +82,8 @@ ANTHROPIC_API_KEY=xxx npm run eval   # live routing-quality eval over eval/datas
 
 The eval reports two numbers:
 
-- **falseDowngradeRate** — Hard tasks routed below opus. **Red line: ~0.**
-- **savingsRate** — spend vs an all-opus baseline. Target 0.3–0.5.
+- **falseDowngradeRate** — Hard tasks routed below heavy. **Red line: ~0.**
+- **savingsRate** — spend vs an all-heavy baseline. Target 0.3–0.5.
 
 ## How it's built
 
@@ -106,13 +108,13 @@ The routing core is host-neutral; adapters only marshal. All hosts share one rou
 
 ## Pro mode: batch routing (budget-adaptive)
 
-`workflows/batch-route.js` is a [Workflow](https://docs.claude.com/claude-code/workflows) for batch processing with cost control. It applies the same quality-first policy **plus** budget awareness: when remaining budget drops below `BUDGET_FLOOR`, `opus` tasks step down to `sonnet` (the only allowed downward override of opus). Hand it a task or an array of tasks as `args`; it routes each with Haiku, then executes each on the chosen model.
+`workflows/batch-route.js` is a [Workflow](https://docs.claude.com/claude-code/workflows) for batch processing with cost control. It applies the same quality-first policy **plus** budget awareness: when remaining budget drops below `BUDGET_FLOOR`, `heavy` tasks step down to `mid` (the only allowed downward override of heavy). Hand it a task or an array of tasks as `args`; it routes each with Haiku, then executes each on the chosen slot's model.
 
 > **Caveat:** workflow scripts run in a sandbox and cannot `import` local modules, so the policy is **inlined** in the script — a sync-guard test (`test/policy-sync.test.js`) fails CI if the copy ever drifts from `src/decide-model.js`. Running it spawns one sub-agent per task (multi-agent orchestration), so it spends tokens.
 
 ## Observability
 
-Every routing decision is shown inline (`smart-dispatch → haiku (Trivial, conf 0.92)`) and appended to a local log at `~/.smart-dispatch/log.jsonl` — **only `tier`, `confidence`, `model`, a timestamp, the subagent type, and a one-way `hash` of the task** are recorded, never the task text. A `Retry` entry records each self-healed downgrade (`escalatedFrom`): when the same task is re-dispatched within the escalation window after being routed below opus, the hook withholds the downgrade and logs the correction — a wrong downgrade costs one cheap attempt, not a broken task.
+Every routing decision is shown inline (`smart-dispatch → light (Trivial, conf 0.92)`) and appended to a local log at `~/.smart-dispatch/log.jsonl` — **only `tier`, `confidence`, `model`, a timestamp, the subagent type, and a one-way `hash` of the task** are recorded, never the task text. A `Retry` entry records each self-healed downgrade (`escalatedFrom`): when the same task is re-dispatched within the escalation window after being routed below heavy, the hook withholds the downgrade and logs the correction — a wrong downgrade costs one cheap attempt, not a broken task.
 
 See aggregate stats anytime:
 
@@ -123,7 +125,7 @@ npm run report -- --since 7d      # last 7 days (or 24h, or 2026-08-01)
 npm run report -- --json          # machine-readable
 ```
 
-It reports total decisions, model/tier/agent distribution, estimated savings vs all-opus (labeled with the versioned price table — the estimate is honest about which prices it used), budget-mode downgrades, and self-healed retries. Override the log path with `SMART_DISPATCH_LOG`.
+It reports total decisions, model/tier/agent distribution, estimated savings vs all-heavy (labeled with the versioned price table — the estimate is honest about which prices it used), budget-mode downgrades, and self-healed retries. Pre-v0.5.0 log entries (haiku/sonnet/opus) are shown canonicalized. Override the log path with `SMART_DISPATCH_LOG`.
 
 ## License
 

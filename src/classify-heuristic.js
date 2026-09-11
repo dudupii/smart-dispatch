@@ -6,13 +6,13 @@
 // read-only Explore agents (full ladder) and read-only/routine-verb
 // general-purpose prompts (narrow gate) — and only when the prompt carries no
 // hard signal. Everything else returns Unknown/low-confidence → decideModel
-// keeps it on opus.
+// keeps it on heavy.
 //
 // Why so narrow: heuristics can misjudge. The smart-dispatch invariant is
 // "never lose quality to a routing mistake" — the only acceptable error is
 // treating a simple task as hard (a little wasted spend). Every widening of
 // this surface is gated by the adversarial tests in test/classify-heuristic.test.js
-// ("…and fix it" traps must stay on opus); if you extend coverage, extend those
+// ("…and fix it" traps must stay on heavy); if you extend coverage, extend those
 // tests first. Retry-escalation (src/escalation.js) is the safety net when a
 // downgrade still slips through.
 //
@@ -60,7 +60,7 @@ export function classifyHeuristic({ subagent_type = '', prompt = '', description
 
   // 2. Any hard signal → Hard, below threshold, for EVERY agent type. This
   //    runs before the type gates so a hard verb protects general-purpose
-  //    dispatches too ("find the root cause and fix it" must stay on opus).
+  //    dispatches too ("find the root cause and fix it" must stay on heavy).
   if (HARD_WORDS.some((w) => text.includes(w))) {
     return { tier: 'Hard', confidence: 0.6, reason: 'hard keyword in prompt' }
   }
@@ -76,12 +76,12 @@ export function classifyHeuristic({ subagent_type = '', prompt = '', description
     if (len < 4000) {
       return { tier: 'Routine', confidence: 0.8, reason: 'routine read-only' }
     }
-    return { tier: 'Unknown', confidence: 0, reason: 'long Explore → leave at opus' }
+    return { tier: 'Unknown', confidence: 0, reason: 'long Explore → leave at heavy' }
   }
 
   // 4. general-purpose — narrow gate: short prompts with an unambiguous
   //    read-only or mechanical verb. Anything else (long, vague, mixed)
-  //    stays on opus.
+  //    stays on heavy.
   if (subagent_type === 'general-purpose') {
     if (len < ROUTINE_GATE_LEN && SEARCH_WORDS.some((w) => text.includes(w))) {
       return { tier: 'Trivial', confidence: 0.82, reason: 'read-only search (general-purpose)' }
@@ -89,9 +89,9 @@ export function classifyHeuristic({ subagent_type = '', prompt = '', description
     if (len < ROUTINE_GATE_LEN && ROUTINE_WORDS.some((w) => text.includes(w))) {
       return { tier: 'Routine', confidence: 0.82, reason: 'mechanical verb (general-purpose)' }
     }
-    return { tier: 'Unknown', confidence: 0, reason: 'general-purpose outside safe verbs → leave at opus' }
+    return { tier: 'Unknown', confidence: 0, reason: 'general-purpose outside safe verbs → leave at heavy' }
   }
 
   // 5. Plan / code-reviewer / custom agents — never downgraded by heuristics.
-  return { tier: 'Unknown', confidence: 0, reason: 'non-Explore → leave at opus' }
+  return { tier: 'Unknown', confidence: 0, reason: 'non-Explore → leave at heavy' }
 }

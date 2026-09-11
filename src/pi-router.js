@@ -15,13 +15,15 @@
 // the session-model bookkeeping that a single-model host requires.
 
 import { routeDispatch } from './dispatch-pipeline.js'
+import { wireName } from './model-registry.js'
 
 const modelKey = (m) => (m ? `${m.provider}/${m.id}` : '')
 
 /**
  * @param {object} deps
  * @param {(provider: string, alias: string) => object|null} deps.findModel
- *   resolve a tier alias ('haiku'|'sonnet'|'opus') to a concrete host model
+ *   resolve a model alias (the slot's wire name, e.g. 'haiku' on anthropic,
+ *   or the slot itself for other providers) to a concrete host model
  * @param {(model: object) => Promise|void} deps.setModel switch the session model
  * @param {(entry: object) => void} [deps.logEntry] shared-log writer
  * @param {() => Array} [deps.readEntries] lazy access to parsed log entries
@@ -64,13 +66,18 @@ export function createPiRouter({
         { config, entries: readEntries, nowMs, logEntry },
       )
 
-      // Downgrades resolve the tier alias to a concrete host model — via the
+      // Downgrades resolve the slot to a concrete host model: slot →
+      // provider wire name (light → 'haiku' for anthropic) first, then the
       // host's own registry when the context carries one, else the injected
       // resolver; anything else restores the base. Never above base.
-      const resolve = (alias) =>
-        (ctx?.modelRegistry && ctx.modelRegistry.find?.(current.provider, alias)) ??
-        findModel?.(current.provider, alias) ??
-        null
+      const resolve = (slot) => {
+        const pattern = wireName(slot, { provider: current.provider }) ?? slot
+        return (
+          (ctx?.modelRegistry && ctx.modelRegistry.find?.(current.provider, pattern)) ??
+          findModel?.(current.provider, pattern) ??
+          null
+        )
+      }
       const targetModel = decision.rewrite ? resolve(decision.rewrite) : base
       if (!targetModel) return decision // unresolvable alias → stay put (safe)
       if (modelKey(targetModel) === modelKey(current)) return decision

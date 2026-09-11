@@ -7,12 +7,17 @@
 //     "downgradeThreshold": 0.8,
 //     "budgetFloor": 0.1,
 //     "escalation": { "enabled": true, "windowMinutes": 10 },
-//     "agentOverrides": { "my-file-finder": "haiku", "my-careful-agent": "never" },
-//     "priceTable": { "haiku": 0.1, "sonnet": 0.3, "opus": 1.0 }
+//     "agentOverrides": { "my-file-finder": "light", "my-careful-agent": "never" },
+//     "priceTable": { "light": 0.1, "mid": 0.3, "heavy": 1.0 }
 //   }
 //
 // agentOverrides maps a subagent_type to a fixed model (routed verbatim, like
 // a user override — never validated) or "never" to leave that type untouched.
+//
+// Slot vocabulary: model slots are light/mid/heavy. The pre-v0.5.0 names
+// (haiku/sonnet/opus) remain legal synonyms everywhere a slot can appear —
+// agentOverrides values and priceTable/codex.models/codex.agents keys — and
+// are canonicalized at load.
 //
 // This module must never throw: the hook imports it, and a routing hook must
 // never break a tool call. Invalid values fall back to the previous layer.
@@ -20,12 +25,13 @@
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { canonicalSlot } from './model-registry.js'
 
 export const DEFAULT_CONFIG = Object.freeze({
-  downgradeThreshold: 0.8, // confidence required to leave opus (see decide-model.js)
-  budgetFloor: 0.1,        // budget fraction below which opus may step down
+  downgradeThreshold: 0.8, // confidence required to leave heavy (see decide-model.js)
+  budgetFloor: 0.1,        // budget fraction below which heavy may step down
   escalation: Object.freeze({
-    enabled: true,         // re-dispatch of a recently downgraded task → escalate to opus
+    enabled: true,         // re-dispatch of a recently downgraded task → escalate to heavy
     windowMinutes: 10,     // how recent counts as "re-dispatch"
   }),
   agentOverrides: Object.freeze({}),
@@ -94,26 +100,32 @@ export function loadConfig({ env = process.env, configPath } = {}) {
     if (file.agentOverrides && typeof file.agentOverrides === 'object') {
       for (const [type, model] of Object.entries(file.agentOverrides)) {
         if (typeof type === 'string' && type.trim() && typeof model === 'string' && model.trim()) {
-          config.agentOverrides[type.trim()] = model.trim()
+          config.agentOverrides[type.trim()] = canonicalSlot(model.trim()) // legacy aliases → slots; ids verbatim
         }
       }
     }
     if (file.priceTable && typeof file.priceTable === 'object') {
       const table = {}
-      for (const key of ['haiku', 'sonnet', 'opus']) {
-        if (Number.isFinite(file.priceTable[key]) && file.priceTable[key] > 0) {
-          table[key] = file.priceTable[key]
+      for (const [key, value] of Object.entries(file.priceTable)) {
+        if (Number.isFinite(value) && value > 0) {
+          table[canonicalSlot(key)] = value // both vocabularies accepted, canonicalized
         }
       }
-      if (Object.keys(table).length === 3) config.priceTable = table // partial tables would skew savings
+      if (['light', 'mid', 'heavy'].every((slot) => slot in table)) {
+        config.priceTable = table // partial tables would skew savings
+      }
     }
     if (file.codex && typeof file.codex === 'object') {
       const codex = {}
       for (const [alias, id] of Object.entries(file.codex.models ?? {})) {
-        if (typeof id === 'string' && id.trim()) codex.models = { ...codex.models, [alias]: id.trim() }
+        if (typeof id === 'string' && id.trim()) {
+          codex.models = { ...codex.models, [canonicalSlot(alias)]: id.trim() }
+        }
       }
       for (const [alias, agent] of Object.entries(file.codex.agents ?? {})) {
-        if (typeof agent === 'string' && agent.trim()) codex.agents = { ...codex.agents, [alias]: agent.trim() }
+        if (typeof agent === 'string' && agent.trim()) {
+          codex.agents = { ...codex.agents, [canonicalSlot(alias)]: agent.trim() }
+        }
       }
       config.codex = codex
     }

@@ -9,10 +9,11 @@
 //     schema, or multi-agent V2 with hide_spawn_agent_metadata = false) and
 //     the spawn itself did NOT name one (it would inherit the session
 //     default), a confident downgrade writes the tier's model id in place.
-//     Ids come from the user's config (codex.models per tier) — OpenAI ids
-//     are not curated in the shared registry (v1 is Anthropic-only), so
-//     unconfigured tiers fall through to veto mode. A spawn that DOES name
-//     a model is an explicit choice — the uniform override rule skips it.
+//     Ids come from the user's config (codex.models per slot — light/mid,
+//     legacy haiku/sonnet keys accepted) — OpenAI ids are not curated in the
+//     shared registry (v2 is Anthropic-wire-names only), so unconfigured
+//     slots fall through to veto mode. A spawn that DOES name a model is an
+//     explicit choice — the uniform override rule skips it.
 //
 //   veto mode — when model metadata is hidden (the V2 default), a confident
 //     downgrade DENIES the spawn with a reason naming the pre-pinned tier
@@ -84,9 +85,10 @@ async function main() {
   if (!decision.downgraded || dryRun) return emitEmpty()
 
   // Rewrite mode: on a spawn that did not name a model (inherit case), a
-  // configured tier→model mapping writes the model in place. Keys are the
-  // tier's model aliases (haiku/sonnet). Spawns that DID name a model were
-  // already skipped as explicit choices by the pipeline.
+  // configured slot→model mapping writes the model in place. Keys are the
+  // canonical slots (light/mid; legacy haiku/sonnet keys canonicalize at
+  // config load). Spawns that DID name a model were already skipped as
+  // explicit choices by the pipeline.
   const rewriteModel = config.codex?.models?.[decision.model] ?? null
   if (toolInput.model === undefined && rewriteModel) {
     process.stdout.write(
@@ -104,7 +106,7 @@ async function main() {
   // Veto mode: deny with the pinned tier agent to re-dispatch to.
   const pinnedAgent =
     config.codex?.agents?.[decision.model] ??
-    { haiku: 'smart-dispatch-explorer', sonnet: 'smart-dispatch-worker' }[decision.model] ??
+    { light: 'smart-dispatch-explorer', mid: 'smart-dispatch-worker' }[decision.model] ??
     'smart-dispatch-explorer'
   process.stdout.write(
     JSON.stringify({

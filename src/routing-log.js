@@ -1,13 +1,16 @@
 // Parse and summarize the smart-dispatch routing log.
 // Log lines are JSON:
-//   {"ts":"...","tier":"Trivial","confidence":0.92,"model":"haiku","host":"claude-code",
-//    "hash":"ab12...","agent":"Explore","escalatedFrom":"haiku"}   (all optional but ts/model)
+//   {"ts":"...","tier":"Trivial","confidence":0.92,"model":"light","host":"claude-code",
+//    "hash":"ab12...","agent":"Explore","escalatedFrom":"light"}   (all optional but ts/model)
 // `hash` is a one-way digest of the task text — the text itself is never logged.
 // `host` names the dispatching agent: claude-code | pi | codex.
+// `model` is the canonical slot (light/mid/heavy); pre-v0.5.0 entries say
+// haiku/sonnet/opus and are canonicalized for display and metrics.
 
 import { appendFileSync, closeSync, mkdirSync, openSync, readSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { computeMetrics } from './compute-metrics.js'
+import { canonicalSlot } from './model-registry.js'
 
 /**
  * Best-effort append of one routing entry. Never throws — logging must not
@@ -110,8 +113,12 @@ const countBy = (entries, key) =>
 /**
  * Summarize parsed log entries into a report object.
  *
+ * Model names are canonicalized (legacy haiku/sonnet/opus → light/mid/heavy)
+ * so a log spanning the v0.5.0 vocabulary switch still groups and prices
+ * coherently.
+ *
  * `hardDowngraded` is the fraction of router-classified Hard tasks routed below
- * opus — normally 0; >0 means budget mode stepped opus down. It is NOT a
+ * heavy — normally 0; >0 means budget mode stepped heavy down. It is NOT a
  * ground-truth quality metric (production has no labels); the labeled eval in
  * eval/ measures true false-downgrade rate.
  *
@@ -123,17 +130,22 @@ const countBy = (entries, key) =>
  *   escalations: number, savingsRate: number|null, hardDowngraded: number|null, recent: Array}}
  */
 export function summarizeEntries(entries, { relativeCost } = {}) {
-  const outcomes = entries.map((e) => ({ trueTier: e.tier, chosenModel: e.model }))
+  const canonical = (entries ?? []).map((e) =>
+    e && typeof e.model === 'string' && e.model !== canonicalSlot(e.model)
+      ? { ...e, model: canonicalSlot(e.model) }
+      : e
+  )
+  const outcomes = canonical.map((e) => ({ trueTier: e.tier, chosenModel: e.model }))
   const metrics = computeMetrics(outcomes, relativeCost ? { relativeCost } : {})
   return {
-    count: entries.length,
-    byModel: countBy(entries, 'model'),
-    byTier: countBy(entries, 'tier'),
-    byAgent: countBy(entries, 'agent'),
-    byHost: countBy(entries, 'host'),
-    escalations: entries.filter((e) => e && typeof e.escalatedFrom === 'string').length,
+    count: canonical.length,
+    byModel: countBy(canonical, 'model'),
+    byTier: countBy(canonical, 'tier'),
+    byAgent: countBy(canonical, 'agent'),
+    byHost: countBy(canonical, 'host'),
+    escalations: canonical.filter((e) => e && typeof e.escalatedFrom === 'string').length,
     savingsRate: metrics.savingsRate,
     hardDowngraded: metrics.falseDowngradeRate,
-    recent: entries.slice(-10),
+    recent: canonical.slice(-10),
   }
 }

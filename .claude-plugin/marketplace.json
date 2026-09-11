@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "smart-dispatch",
-      "description": "Quality-first automatic model routing for Claude Code sub-agents. Default opus, downgrade only on confident trivial/routine tasks.",
+      "description": "Quality-first automatic model routing for Claude Code sub-agents. Default heavy, downgrade only on confident trivial/routine tasks.",
       "category": "development",
       "version": "0.3.0",
       "source": "./",

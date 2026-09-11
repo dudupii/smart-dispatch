@@ -19,9 +19,9 @@ Requires Node ≥ 18 (CI runs 22 and 24).
 
 ## How to work
 
-- **TDD.** Pure logic lives in `src/` and is fully unit-tested. Write/adjust the test first, watch it fail, then implement. The quality-first guarantee ("never downgrade a Hard task below opus") must stay backed by tests.
+- **TDD.** Pure logic lives in `src/` and is fully unit-tested. Write/adjust the test first, watch it fail, then implement. The quality-first guarantee ("never downgrade a Hard task below heavy") must stay backed by tests.
 - **YAGNI.** Don't add a feature unless it has a clear user. The Workflow pro mode and i18n were both deferred until asked — that's the house style.
-- **Don't break the guarantee.** The only acceptable misjudgment direction is treating a simple task as hard. A PR that can route a Hard task below opus (other than documented budget mode) will not merge.
+- **Don't break the guarantee.** The only acceptable misjudgment direction is treating a simple task as hard. A PR that can route a Hard task below heavy (other than documented budget mode) will not merge.
 
 ## Validating your change
 

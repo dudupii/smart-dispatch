@@ -1,7 +1,7 @@
 # smart-dispatch
 
 > Claude Code サブエージェント向けの、品質優先の自動モデルルーティング。
-> **すべてのタスクに正しいモデルを——デフォルトは最強、確信できる琐碎タスクのみダウングレード。**
+> **すべてのタスクに正しいモデルを——デフォルトは最強、確信できる些細なタスクのみダウングレード。**
 
 [![tests](https://img.shields.io/github/actions/workflow/status/dudupii/smart-dispatch/test.yml?branch=master&label=tests)](https://github.com/dudupii/smart-dispatch/actions/workflows/test.yml)
 [![version](https://img.shields.io/github/v/release/dudupii/smart-dispatch?color=blue)](https://github.com/dudupii/smart-dispatch/releases)
@@ -19,15 +19,17 @@
 サブエージェントをディスパッチする前に、smart-dispatch は：
 
 1. **安価なモデル**（Haiku）でタスクを分類 → `{tier, confidence}`。
-2. **品質優先ポリシー**を適用：デフォルトは `opus`。`tier ∈ {Trivial, Routine}` かつ `confidence ≥ 0.8` のときのみダウングレード。
-3. 選ばれたモデルでワーカーエージェントをディスパッチ。
+2. **品質優先ポリシー**を適用：デフォルトは `heavy`。`tier ∈ {Trivial, Routine}` かつ `confidence ≥ 0.8` のときのみダウングレード。
+3. 選ばれたスロットのモデルでワーカーエージェントをディスパッチ。
 
-| Tier | 例 | モデル |
+| Tier | 例 | スロット |
 |------|----|--------|
-| Trivial | grep、ファイル一覧、設定の読み取り | haiku |
-| Routine | 定型的な編集、要約、フォーマット | sonnet |
-| Hard | 設計、デバッグ、新規コード、アーキテクチャ | opus |
-| 不確実 | 曖昧なものすべて | opus（フォールバック） |
+| Trivial | grep、ファイル一覧、設定の読み取り | light |
+| Routine | 定型的な編集、要約、フォーマット | mid |
+| Hard | 設計、デバッグ、新規コード、アーキテクチャ | heavy |
+| 不確実 | 曖昧なものすべて | heavy（フォールバック） |
+
+モデル名は**ホスト中立なスロット**——`light` / `mid` / `heavy` です。各ホストはこれを自身のモデルへ解決します：Claude Code では `light→haiku`、`mid→sonnet`、`heavy→opus`。Codex では `codex.models` 設定が、Pi では現在のプロバイダーの製品ラインが対応します。v0.5.0 より前の名前（`haiku`/`sonnet`/`opus`）は、設定や旧ログにおいて引き続き有効な同義語です。
 
 ルーター自身が出力する `model` フィールドは**無視されます**——ポリシーは `tier` + `confidence` だけから決定し直します。
 
@@ -59,13 +61,13 @@ claude plugin update smart-dispatch
   "downgradeThreshold": 0.8,
   "budgetFloor": 0.1,
   "escalation": { "enabled": true, "windowMinutes": 10 },
-  "agentOverrides": { "my-file-finder": "haiku", "my-careful-agent": "never" },
-  "priceTable": { "haiku": 0.1, "sonnet": 0.3, "opus": 1.0 }
+  "agentOverrides": { "my-file-finder": "light", "my-careful-agent": "never" },
+  "priceTable": { "light": 0.1, "mid": 0.3, "heavy": 1.0 }
 }
 ```
 
-- **`downgradeThreshold`**（デフォルト `0.8`、環境変数 `SMART_DISPATCH_THRESHOLD`）—— opus から離れるために必要な信頼度。上げる = より保守的、下げる = より積極的にダウングレード。
-- **`budgetFloor`**（デフォルト `0.1`、環境変数 `SMART_DISPATCH_BUDGET_FLOOR`）—— 予算モード（Workflow プロモード）のみ：残り予算がこの割合を下回ると opus が sonnet に下がります。
+- **`downgradeThreshold`**（デフォルト `0.8`、環境変数 `SMART_DISPATCH_THRESHOLD`）—— heavy から離れるために必要な信頼度。上げる = より保守的（全 heavy に近づく）、下げる = より積極的にダウングレード。
+- **`budgetFloor`**（デフォルト `0.1`、環境変数 `SMART_DISPATCH_BUDGET_FLOOR`）—— 予算モード（Workflow プロモード）のみ：残り予算がこの割合を下回ると heavy が mid に下がります。既にダウングレード済みのタスクを引き上げることはありません。
 - **`escalation`**（キルスイッチ：`SMART_DISPATCH_ESCALATION=0`）—— ダウングレード後に再ディスパッチされたタスクの自己修復ウィンドウ。
 - **`agentOverrides`** —— サブエージェントタイプごとの固定モデル（ユーザー上書きとしてそのまま適用）、または `"never"` でそのタイプを対象外に。
 - **ルーターモデル** —— デフォルトは Haiku（`eval/run-eval.js` で設定）。eval で誤ダウングレードが見られれば Sonnet に引き上げます。
@@ -80,8 +82,8 @@ ANTHROPIC_API_KEY=xxx npm run eval   # eval/dataset.json で実際のルーテ�
 
 eval は 2 つの数字を報告します：
 
-- **falseDowngradeRate** —— Hard タスクが opus 未満にルーティングされた割合。**レッドライン：ほぼ 0。**
-- **savingsRate** —— 全 opus ベースラインに対する支出削減率。目標 0.3–0.5。
+- **falseDowngradeRate** —— Hard タスクが heavy 未満にルーティングされた割合。**レッドライン：ほぼ 0。**
+- **savingsRate** —— 全 heavy ベースラインに対する支出削減率。目標 0.3–0.5。
 
 ## どう構築されているか
 
@@ -102,18 +104,18 @@ eval は 2 つの数字を報告します：
 
 ルーティングコアはホスト非依存で、アダプターはマーシャリングのみを担います。すべてのホストが同じルーティングログ（`host` タグ付き）、ホスト横断のリトライ自己修復、明示モデル＝オーバーライドの規則、dry-run を共有します。
 
-- **Pi** —— Pi パッケージとしてインストール：`pi install https://github.com/dudupii/smart-dispatch`。スキルとプロンプトごとのルーティング拡張を同梱。Pi はセッションごとに 1 モデルのため、ルーティングはプロンプトごとのセッション切替に対応付けられます：確信を持って琐碎/定型のプロンプトはそのターンだけ安いモデルへ下げ、それ以外はセッションベースを復元します。`/model` や Ctrl+P でルーティングは永久に退避（ユーザーオーバーライド）。**セッションベースより上のモデルは決して選びません**。
-- **Codex** —— [`codex/`](./codex/README.md) の `PreToolUse` フックは双モード：**拒否モード**（デフォルトのマルチエージェント V2 で動作）は確信を持って琐碎な spawn を理由付きで拒否し、固定档位エージェント（`codex/agents/*.toml`）への再派遣を指示します。**書き換えモード**（メタデータ可視スキーマ）は `codex.models` を設定すれば継承型 spawn に档位モデルを書き込みます。公式フック文書の契約に照らして検証済み。実機スパイクは未実施です。
+- **Pi** —— Pi パッケージとしてインストール：`pi install https://github.com/dudupii/smart-dispatch`。スキルとプロンプトごとのルーティング拡張を同梱。Pi はセッションごとに 1 モデルのため、ルーティングはプロンプトごとのセッション切替に対応付けられます：確信を持って些細/定型のプロンプトはそのターンだけ安いモデルへ下げ、それ以外はセッションベースを復元します。`/model` や Ctrl+P でルーティングは永久に退避（ユーザーオーバーライド）。**セッションベースより上のモデルは決して選びません**。
+- **Codex** —— [`codex/`](./codex/README.md) の `PreToolUse` フックは双モード：**拒否モード**（デフォルトのマルチエージェント V2 で動作）は確信を持って些細な spawn を理由付きで拒否し、固定スロットエージェント（`codex/agents/*.toml`）への再派遣を指示します。**書き換えモード**（メタデータ可視スキーマ）は `codex.models` を設定すれば継承型 spawn にスロットのモデルを書き込みます。公式フック文書の契約に照らして検証済み。実機スパイクは未実施です。
 
 ## プロモード：バッチルーティング（予算適応型）
 
-`workflows/batch-route.js` は、バッチ処理とコスト制御のための [Workflow](https://docs.claude.com/claude-code/workflows) です。同じ品質優先ポリシーに**予算認識**を加えます：残り予算が `budgetFloor` を下回ると、`opus` タスクが `sonnet` に下がります（許容される唯一の opus の下方上書き）。タスク 1 つ、またはタスクの配列を `args` に渡してください。Haiku で各タスクをルーティングし、選ばれたモデルで実行します。
+`workflows/batch-route.js` は、バッチ処理とコスト制御のための [Workflow](https://docs.claude.com/claude-code/workflows) です。同じ品質優先ポリシーに**予算認識**を加えます：残り予算が `budgetFloor` を下回ると、`heavy` タスクが `mid` に下がります（許容される唯一の heavy の下方上書き）。タスク 1 つ、またはタスクの配列を `args` に渡してください。Haiku で各タスクをルーティングし、選ばれたスロットのモデルで実行します。
 
 > **注意：** ワークフロースクリプトはサンドボックスで動作しローカルモジュールを `import` できないため、ポリシーはスクリプト内に**インライン**で複製されています（同期ガードテストが門番します）。`src/decide-model.js` が唯一の信頼できる情報源です。実行するとタスクごとにサブエージェントをスポーンするため（マルチエージェントオーケストレーション）、トークンを消費します。
 
 ## オブザーバビリティ
 
-毎回のルーティング決定はインラインで 1 行表示され（`smart-dispatch → haiku (Trivial, conf 0.92)`）、ローカルログ `~/.smart-dispatch/log.jsonl` に追記されます——**記録されるのは `tier`、`confidence`、`model`、タイムスタンプ、サブエージェントタイプ、タスクの一方向 `hash` だけで、タスク本文は一切記録されません**。`Retry` エントリは自己修復された各ダウングレード（`escalatedFrom`）を記録します。エスカレーションウィンドウ内で同じタスクが再ディスパッチされ、直前が opus 未満にルーティングされていた場合、フックはダウングレードを差し控え、その修正をログに残します——誤ダウングレード 1 回のコストは安価な試行 1 回であって、タスクの破壊ではありません。
+毎回のルーティング決定はインラインで 1 行表示され（`smart-dispatch → light (Trivial, conf 0.92)`）、ローカルログ `~/.smart-dispatch/log.jsonl` に追記されます——**記録されるのは `tier`、`confidence`、`model`、タイムスタンプ、サブエージェントタイプ、タスクの一方向 `hash` だけで、タスク本文は一切記録されません**。`Retry` エントリは自己修復された各ダウングレード（`escalatedFrom`）を記録します。エスカレーションウィンドウ内で同じタスクが再ディスパッチされ、直前が heavy 未満にルーティングされていた場合、フックはダウングレードを差し控え、その修正をログに残します——誤ダウングレード 1 回のコストは安価な試行 1 回であって、タスクの破壊ではありません。
 
 集計統計はいつでも確認できます：
 
@@ -124,7 +126,7 @@ npm run report -- --since 7d      # 直近 7 日（24h や 2026-08-01 も可）
 npm run report -- --json          # 機械可読フォーマット
 ```
 
-総決定数、モデル／tier／agent 分布、全 opus 基準の推定節約率（使用したバージョン付き価格テーブルの明記付き——どの価格を使った見積もりかが分かります）、予算モードでのダウングレード頻度、自己修復されたリトライ数を報告します。ログパスは `SMART_DISPATCH_LOG` で上書きできます。
+総決定数、モデル／tier／agent 分布、全 heavy 基準の推定節約率（使用したバージョン付き価格テーブルの明記付き——どの価格を使った見積もりかが分かります）、予算モードでのダウングレード頻度、自己修復されたリトライ数を報告します。v0.5.0 より前のログエントリ（haiku/sonnet/opus）は正規化して表示されます。ログパスは `SMART_DISPATCH_LOG` で上書きできます。
 
 ## ライセンス
 

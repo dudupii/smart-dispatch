@@ -20,7 +20,10 @@ test('hashPrompt: empty input → null (nothing to match on)', () => {
   assert.equal(hashPrompt({ prompt: '   ', description: '' }), null)
 })
 
-test('shouldEscalate: recent below-opus dispatch of the same task → escalate', () => {
+// Legacy-vocabulary entries (pre-v0.5.0 logs say haiku/sonnet/opus) and
+// canonical slot entries (light/mid/heavy) must both match — the shared log
+// spans the upgrade.
+test('shouldEscalate: recent below-heavy dispatch of the same task → escalate (legacy entry)', () => {
   const r = shouldEscalate({
     entries: [{ ts: '2026-09-02T11:55:00Z', model: 'haiku', hash: HASH }],
     hash: HASH,
@@ -30,14 +33,26 @@ test('shouldEscalate: recent below-opus dispatch of the same task → escalate',
   assert.deepEqual(r, { escalate: true, fromModel: 'haiku' })
 })
 
-test('shouldEscalate: task previously on opus → nothing to fix', () => {
+test('shouldEscalate: recent below-heavy dispatch → escalate (canonical entry)', () => {
   const r = shouldEscalate({
-    entries: [{ ts: '2026-09-02T11:55:00Z', model: 'opus', hash: HASH }],
+    entries: [{ ts: '2026-09-02T11:55:00Z', model: 'light', hash: HASH }],
     hash: HASH,
     nowMs: NOW,
     windowMinutes: 10,
   })
-  assert.equal(r.escalate, false)
+  assert.deepEqual(r, { escalate: true, fromModel: 'light' })
+})
+
+test('shouldEscalate: task previously on heavy → nothing to fix (both vocabularies)', () => {
+  for (const model of ['opus', 'heavy']) {
+    const r = shouldEscalate({
+      entries: [{ ts: '2026-09-02T11:55:00Z', model, hash: HASH }],
+      hash: HASH,
+      nowMs: NOW,
+      windowMinutes: 10,
+    })
+    assert.equal(r.escalate, false, `legacy 'opus' must canonicalize to heavy, not count as a downgrade`)
+  }
 })
 
 test('shouldEscalate: outside the window → stale, not a retry', () => {
@@ -77,17 +92,17 @@ test('shouldEscalate: a dispatch after an escalation still withholds the downgra
   assert.deepEqual(r, { escalate: true, fromModel: 'haiku' })
 })
 
-test('shouldEscalate: newest matching entry wins', () => {
+test('shouldEscalate: newest matching entry wins (across vocabularies)', () => {
   const r = shouldEscalate({
     entries: [
-      { ts: '2026-09-02T11:50:00Z', model: 'haiku', hash: HASH }, // older haiku
-      { ts: '2026-09-02T11:56:00Z', model: 'sonnet', hash: HASH }, // newest
+      { ts: '2026-09-02T11:50:00Z', model: 'haiku', hash: HASH }, // older, legacy
+      { ts: '2026-09-02T11:56:00Z', model: 'mid', hash: HASH }, // newest, canonical
     ],
     hash: HASH,
     nowMs: NOW,
     windowMinutes: 10,
   })
-  assert.deepEqual(r, { escalate: true, fromModel: 'sonnet' })
+  assert.deepEqual(r, { escalate: true, fromModel: 'mid' })
 })
 
 test('shouldEscalate: undatable/garbage entries are ignored, never crash', () => {

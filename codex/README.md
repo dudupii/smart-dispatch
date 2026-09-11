@@ -5,12 +5,12 @@ hook (block + `updatedInput` rewriting). Two modes, chosen per spawn:
 
 - **Veto mode** (works under default multi-agent V2, where spawn model
   metadata is hidden): a confidently trivial/routine spawn is **denied** with
-  a reason naming a pre-pinned tier agent to re-dispatch to. Costs one extra
+  a reason naming a pre-pinned slot agent to re-dispatch to. Costs one extra
   round-trip on downgraded spawns only; hard/uncertain tasks always pass.
 - **Rewrite mode** (older schema, or V2 with `hide_spawn_agent_metadata = false`
   in `~/.codex/config.toml`): a downgrade on a spawn that did **not** name a
-  model (it would inherit the session default) writes the tier's model id in
-  place, exactly like the Claude Code hook. Requires tier→model ids in your
+  model (it would inherit the session default) writes the slot's model id in
+  place, exactly like the Claude Code hook. Requires slot→model ids in your
   smart-dispatch config (see below). A spawn that names a model is an
   explicit choice and is never touched.
 
@@ -37,7 +37,7 @@ hook (block + `updatedInput` rewriting). Two modes, chosen per spawn:
 
    Codex asks you to review non-managed hooks before they run — approve it.
 
-2. **Tier agents** (veto mode) — copy or symlink `codex/agents/*.toml` into
+2. **Slot agents** (veto mode) — copy or symlink `codex/agents/*.toml` into
    `~/.codex/agents/`, then edit each file's `model` to what your plan offers
    (keep the explorer lane materially cheaper than your default model).
 
@@ -46,13 +46,15 @@ hook (block + `updatedInput` rewriting). Two modes, chosen per spawn:
    ```json
    {
      "codex": {
-       "models": { "haiku": "<cheap model id>", "sonnet": "<mid model id>" },
-       "agents": { "haiku": "smart-dispatch-explorer", "sonnet": "smart-dispatch-worker" }
+       "models": { "light": "<cheap model id>", "mid": "<mid model id>" },
+       "agents": { "light": "smart-dispatch-explorer", "mid": "smart-dispatch-worker" }
      }
    }
    ```
 
-   `agents` overrides the deny reason's target if you rename the TOMLs.
+   Slot keys are canonical (`light`/`mid`/`heavy`); the pre-v0.5.0 names
+   (`haiku`/`sonnet`/`opus`) still work as synonyms. `agents` overrides the
+   deny reason's target if you rename the TOMLs.
 
 ## Behaviour shared with the other hosts
 
@@ -82,7 +84,7 @@ mode) and that the hook fires:
 3. Inspect the captured payload: if `tool_input` carries a `model` field,
    rewrite mode is available (configure `codex.models`); if it only has
    `task_name`/`message`/`fork_turns`, you are on metadata-hidden V2 — veto
-   mode with the tier agents is the path.
+   mode with the slot agents is the path.
 4. Then install this adapter per the instructions above and re-run: the
    shared log (`~/.smart-dispatch/log.jsonl`) should gain a `host: "codex"`
-   entry, and trivial spawns should get denied with the tier-agent reason.
+   entry, and trivial spawns should get denied with the slot-agent reason.

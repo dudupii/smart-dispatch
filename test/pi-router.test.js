@@ -8,6 +8,9 @@ const HAIKU = { provider: 'anthropic', id: 'claude-haiku-4-5' }
 const key = (m) => `${m.provider}/${m.id}`
 
 // A pi-like ctx: current model + fuzzy model registry, recording setModel calls.
+// The router resolves a canonical slot to its provider wire name before the
+// registry lookup (light → 'haiku' for the anthropic provider), so findable
+// is keyed by wire names.
 function fakeCtx({ current = BASE, findable = { haiku: HAIKU } } = {}) {
   const calls = []
   return {
@@ -39,8 +42,8 @@ test('confident trivial prompt steps the session down for this loop', async () =
   const fx = fakeCtx()
   const r = router({ setModel: fx.setModel })
   const d = await r.onPrompt('list all files in the src directory', fx.ctx)
-  assert.equal(d.rewrite, 'haiku')
-  assert.deepEqual(fx.calls, [key(HAIKU)])
+  assert.equal(d.rewrite, 'light', 'decision speaks canonical slots')
+  assert.deepEqual(fx.calls, [key(HAIKU)], 'resolved through the provider wire name')
 })
 
 test('a hard first prompt changes nothing — base model is the ceiling', async () => {
@@ -86,7 +89,7 @@ test('tier alias not resolvable in the registry → stay put (safe direction)', 
   const fx = fakeCtx({ findable: {} }) // host registry can't resolve the alias
   const r = router({ setModel: fx.setModel }) // injected resolver also finds nothing
   const d = await r.onPrompt('list all files in the src directory', fx.ctx)
-  assert.equal(d.rewrite, 'haiku')
+  assert.equal(d.rewrite, 'light')
   assert.deepEqual(fx.calls, [], 'no concrete model found — never force a guess')
 })
 
@@ -109,6 +112,7 @@ test('retry of a downgraded prompt restores the base and logs the Retry', async 
   await r.onPrompt(prompt, ctx())
   const downgrade = logged.at(-1)
   assert.ok(downgrade.hash, 'downgrade logged its hash')
+  // legacy-vocabulary history entry (pre-v0.5.0) — must still match
   logEntries.push({ ts: new Date(Date.now() - 60_000).toISOString(), model: 'haiku', hash: downgrade.hash })
 
   // 3. same prompt again within the window — self-heal restores the base

@@ -4,7 +4,7 @@ description: Show smart-dispatch routing stats — model distribution, estimated
 
 Show the user their smart-dispatch routing stats.
 
-Read the routing log at `$SMART_DISPATCH_LOG` (default `~/.smart-dispatch/log.jsonl`) and summarize it: total decisions, model distribution (haiku / sonnet / opus counts), tier and agent breakdowns, estimated savings vs an all-opus baseline (labeled with the versioned price table), the fraction of Hard-tier tasks downgraded (budget mode), and the number of self-healed retries (entries with `escalatedFrom`).
+Read the routing log at `$SMART_DISPATCH_LOG` (default `~/.smart-dispatch/log.jsonl`) and summarize it: total decisions, model distribution (light / mid / heavy counts), tier and agent breakdowns, estimated savings vs an all-heavy baseline (labeled with the versioned price table), the fraction of Hard-tier tasks downgraded (budget mode), and the number of self-healed retries (entries with `escalatedFrom`). Pre-v0.5.0 entries (haiku/sonnet/opus) count as their canonical slots.
 
 If the user asks for a time window, filter to entries with `ts` at/after the window start (today = local midnight; `7d`/`24h` = span ago).
 

@@ -33,14 +33,31 @@ test('config file overrides defaults; invalid values fall back per-field', () =>
       downgradeThreshold: 0.9,
       budgetFloor: 'not-a-number',
       escalation: { windowMinutes: 5 },
-      agentOverrides: { 'file-finder': 'haiku', '': 'opus', careful: 42 },
+      agentOverrides: { 'file-finder': 'light', '': 'heavy', careful: 42 },
     }),
     (path) => {
       const c = loadConfig({ env: { SMART_DISPATCH_CONFIG: path } })
       assert.equal(c.downgradeThreshold, 0.9)
       assert.equal(c.budgetFloor, DEFAULT_CONFIG.budgetFloor) // invalid → default
       assert.equal(c.escalation.windowMinutes, 5)
-      assert.deepEqual(c.agentOverrides, { 'file-finder': 'haiku' }) // junk entries dropped
+      assert.deepEqual(c.agentOverrides, { 'file-finder': 'light' }) // junk entries dropped
+    },
+  )
+})
+
+test('agentOverrides values: legacy aliases canonicalized; "never" and concrete ids verbatim', () => {
+  withTempConfig(
+    JSON.stringify({
+      agentOverrides: { finder: 'haiku', careful: 'claude-opus-4-1', untouched: 'never', modern: 'mid' },
+    }),
+    (path) => {
+      const c = loadConfig({ env: { SMART_DISPATCH_CONFIG: path } })
+      assert.deepEqual(c.agentOverrides, {
+        finder: 'light', // legacy alias → canonical slot
+        careful: 'claude-opus-4-1', // concrete id — not a slot, passes through
+        untouched: 'never',
+        modern: 'mid',
+      })
     },
   )
 })
@@ -78,13 +95,29 @@ test('escalation kill switch via env', () => {
   assert.equal(on.escalation.enabled, true)
 })
 
-test('priceTable accepted only when all three models are present and positive', () => {
+test('priceTable accepted only when all three slots are present and positive', () => {
+  withTempConfig(JSON.stringify({ priceTable: { light: 0.2, mid: 0.4, heavy: 1 } }), (path) => {
+    const c = loadConfig({ env: { SMART_DISPATCH_CONFIG: path } })
+    assert.deepEqual(c.priceTable, { light: 0.2, mid: 0.4, heavy: 1 })
+  })
+  // Legacy vocabulary keys are accepted and canonicalized.
   withTempConfig(JSON.stringify({ priceTable: { haiku: 0.2, sonnet: 0.4, opus: 1 } }), (path) => {
     const c = loadConfig({ env: { SMART_DISPATCH_CONFIG: path } })
-    assert.deepEqual(c.priceTable, { haiku: 0.2, sonnet: 0.4, opus: 1 })
+    assert.deepEqual(c.priceTable, { light: 0.2, mid: 0.4, heavy: 1 })
   })
-  withTempConfig(JSON.stringify({ priceTable: { haiku: 0.2, sonnet: 0.4 } }), (path) => {
+  withTempConfig(JSON.stringify({ priceTable: { light: 0.2, mid: 0.4 } }), (path) => {
     const c = loadConfig({ env: { SMART_DISPATCH_CONFIG: path } })
     assert.equal(c.priceTable, null) // partial table would skew savings
   })
+})
+
+test('codex.models / codex.agents keys accept both vocabularies, canonicalized', () => {
+  withTempConfig(
+    JSON.stringify({ codex: { models: { haiku: 'gpt-5-mini', mid: 'gpt-5' }, agents: { haiku: 'my-explorer' } } }),
+    (path) => {
+      const c = loadConfig({ env: { SMART_DISPATCH_CONFIG: path } })
+      assert.deepEqual(c.codex.models, { light: 'gpt-5-mini', mid: 'gpt-5' })
+      assert.deepEqual(c.codex.agents, { light: 'my-explorer' })
+    },
+  )
 })

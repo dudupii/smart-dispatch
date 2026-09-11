@@ -1,7 +1,10 @@
+import { canonicalSlot } from './model-registry.js'
+
 const VALID_TIERS = new Set(['Trivial', 'Routine', 'Hard'])
-const VALID_MODELS = new Set(['haiku', 'sonnet', 'opus'])
+const VALID_MODELS = new Set(['light', 'mid', 'heavy', 'haiku', 'sonnet', 'opus']) // canonical + legacy
 
 // Validate a parsed object into a decision, or null if invalid/incomplete.
+// Legacy model names canonicalize to slots on the way through.
 function validate(obj) {
   const tier = typeof obj?.tier === 'string' ? obj.tier.trim() : ''
   const model = typeof obj?.model === 'string' ? obj.model.trim() : ''
@@ -11,7 +14,7 @@ function validate(obj) {
   if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) return null
   return {
     tier,
-    model,
+    model: canonicalSlot(model),
     confidence,
     reason: typeof obj.reason === 'string' ? obj.reason : '',
   }
@@ -28,7 +31,7 @@ function validate(obj) {
  *
  * @param {string} raw - raw text from the router agent
  * @returns {{tier:string,model:string,confidence:number,reason:string}|null}
- *   Returns null on any malformation — the caller then falls back to opus.
+ *   Returns null on any malformation — the caller then falls back to heavy.
  */
 export function parseRouterOutput(raw) {
   if (typeof raw !== 'string') return null

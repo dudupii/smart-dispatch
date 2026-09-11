@@ -43,23 +43,35 @@ test('summarizeEntries: empty → zeroed report', () => {
 
 test('summarizeEntries: model breakdown + savings', () => {
   const s = summarizeEntries([
-    { tier: 'Trivial', model: 'haiku' },
-    { tier: 'Hard', model: 'opus' },
+    { tier: 'Trivial', model: 'light' },
+    { tier: 'Hard', model: 'heavy' },
   ])
   assert.equal(s.count, 2)
-  assert.deepEqual(s.byModel, { haiku: 1, opus: 1 })
+  assert.deepEqual(s.byModel, { light: 1, heavy: 1 })
   // actual 0.1 + 1.0 = 1.1 vs baseline 2.0 → 0.45
   assert.equal(s.savingsRate, 0.45)
-  assert.equal(s.hardDowngraded, 0) // the one Hard task stayed on opus
+  assert.equal(s.hardDowngraded, 0) // the one Hard task stayed on heavy
 })
 
 test('summarizeEntries: Hard task downgraded shows in hardDowngraded', () => {
-  const s = summarizeEntries([{ tier: 'Hard', model: 'sonnet' }])
+  const s = summarizeEntries([{ tier: 'Hard', model: 'mid' }])
   assert.equal(s.hardDowngraded, 1) // budget-mode style downgrade
 })
 
+test('summarizeEntries: legacy model names canonicalized for display + metrics', () => {
+  // Pre-v0.5.0 log entries say haiku/sonnet/opus — the report must not split
+  // them into separate rows or price them as unknowns.
+  const s = summarizeEntries([
+    { tier: 'Trivial', model: 'haiku' },
+    { tier: 'Hard', model: 'opus' },
+  ])
+  assert.deepEqual(s.byModel, { light: 1, heavy: 1 })
+  assert.equal(s.savingsRate, 0.45)
+  assert.equal(s.hardDowngraded, 0)
+})
+
 test('summarizeEntries: recent caps at last 10', () => {
-  const entries = Array.from({ length: 12 }, (_, i) => ({ tier: 'Trivial', model: 'haiku', ts: String(i) }))
+  const entries = Array.from({ length: 12 }, (_, i) => ({ tier: 'Trivial', model: 'light', ts: String(i) }))
   const s = summarizeEntries(entries)
   assert.equal(s.recent.length, 10)
   assert.equal(s.recent[0].ts, '2') // dropped the first two
@@ -67,10 +79,10 @@ test('summarizeEntries: recent caps at last 10', () => {
 
 test('summarizeEntries: byTier / byAgent / escalations', () => {
   const s = summarizeEntries([
-    { tier: 'Trivial', model: 'haiku', agent: 'Explore' },
-    { tier: 'Trivial', model: 'haiku', agent: 'Explore' },
-    { tier: 'Retry', model: 'opus', agent: 'Explore', escalatedFrom: 'haiku' },
-    { tier: 'Hard', model: 'opus' }, // no agent — not counted in byAgent
+    { tier: 'Trivial', model: 'light', agent: 'Explore' },
+    { tier: 'Trivial', model: 'light', agent: 'Explore' },
+    { tier: 'Retry', model: 'heavy', agent: 'Explore', escalatedFrom: 'light' },
+    { tier: 'Hard', model: 'heavy' }, // no agent — not counted in byAgent
   ])
   assert.deepEqual(s.byTier, { Trivial: 2, Retry: 1, Hard: 1 })
   assert.deepEqual(s.byAgent, { Explore: 3 })
@@ -79,17 +91,17 @@ test('summarizeEntries: byTier / byAgent / escalations', () => {
 
 test('summarizeEntries: byHost groups entries across hosts', () => {
   const s = summarizeEntries([
-    { tier: 'Trivial', model: 'haiku', host: 'claude-code' },
-    { tier: 'Hard', model: 'opus', host: 'pi' },
-    { tier: 'Hard', model: 'opus' }, // legacy entry without host
+    { tier: 'Trivial', model: 'light', host: 'claude-code' },
+    { tier: 'Hard', model: 'heavy', host: 'pi' },
+    { tier: 'Hard', model: 'heavy' }, // legacy entry without host
   ])
   assert.deepEqual(s.byHost, { 'claude-code': 1, pi: 1 })
 })
 
 test('summarizeEntries: relativeCost override changes the savings estimate', () => {
-  const entries = [{ tier: 'Trivial', model: 'haiku' }, { tier: 'Hard', model: 'opus' }]
+  const entries = [{ tier: 'Trivial', model: 'light' }, { tier: 'Hard', model: 'heavy' }]
   const stock = summarizeEntries(entries)
-  const doubled = summarizeEntries(entries, { relativeCost: { haiku: 0.2, sonnet: 0.3, opus: 1.0 } })
+  const doubled = summarizeEntries(entries, { relativeCost: { light: 0.2, mid: 0.3, heavy: 1.0 } })
   assert.equal(stock.savingsRate, 0.45)
   assert.equal(doubled.savingsRate, 0.4)
 })

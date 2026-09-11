@@ -88,7 +88,7 @@ test('all READMEs tuning knobs match the code (no drift)', () => {
 })
 
 test('policy sanity check (guards against accidental policy change)', () => {
-  assert.equal(decideModel({ tier: 'Hard', confidence: 0.99 }).model, 'opus')
-  assert.equal(decideModel({ tier: 'Trivial', confidence: 0.9 }).model, 'haiku')
-  assert.equal(decideModel({ tier: 'Trivial', confidence: 0.5 }).model, 'opus')
+  assert.equal(decideModel({ tier: 'Hard', confidence: 0.99 }).model, 'heavy')
+  assert.equal(decideModel({ tier: 'Trivial', confidence: 0.9 }).model, 'light')
+  assert.equal(decideModel({ tier: 'Trivial', confidence: 0.5 }).model, 'heavy')
 })

@@ -1,16 +1,20 @@
 // Retry-escalation: self-healing for downgrades that were wrong.
 //
-// When a task we routed below opus comes back — the model re-dispatched the
+// When a task we routed below heavy comes back — the model re-dispatched the
 // same thing shortly after — that re-dispatch is strong evidence the cheap
-// model didn't cut it. The hook then skips the downgrade and lets the call
-// inherit the session default (normally opus), turning a quality loss into
+// slot didn't cut it. The hook then skips the downgrade and lets the call
+// inherit the session default (normally heavy), turning a quality loss into
 // one cheap attempt + automatic correction.
 //
 // Privacy invariant: the log never stores task text. Matching is done on a
 // short one-way hash of the normalized prompt — enough to recognize "same
 // task again", not enough to reconstruct anything about it.
+//
+// The shared log spans the v0.5.0 vocabulary switch, so model comparisons
+// canonicalize legacy entries (haiku/sonnet/opus) before deciding.
 
 import { createHash } from 'node:crypto'
+import { canonicalSlot } from './model-registry.js'
 
 /**
  * Stable short hash of a task's identity. Normalizes whitespace so a literal
@@ -52,9 +56,10 @@ export function shouldEscalate({
     if (!Number.isFinite(ts)) continue // undatable entry — can't prove recency
     const age = nowMs - ts
     if (age < 0 || age > windowMs) continue // stale (or clock-skewed) — not a retry
-    // Same task, recently routed below opus → escalate. If it already ran on
-    // opus there is nothing to fix.
-    if (typeof e.model === 'string' && e.model !== 'opus') {
+    // Same task, recently routed below heavy → escalate. If it already ran on
+    // heavy there is nothing to fix. (Legacy 'opus' canonicalizes to heavy —
+    // it must never count as a downgrade.)
+    if (typeof e.model === 'string' && canonicalSlot(e.model) !== 'heavy') {
       return { escalate: true, fromModel: e.model }
     }
     return { escalate: false, fromModel: null }

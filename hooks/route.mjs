@@ -6,6 +6,11 @@
 // pipeline, and translate the decision back — a rewrite becomes updatedInput,
 // anything else passes through untouched (dry-run suppresses rewrites).
 //
+// Vocabulary boundary: the pipeline speaks canonical slots (light/mid/heavy);
+// this adapter resolves them to the host's wire names (haiku/sonnet/opus) at
+// the updatedInput write. Non-slot rewrites (config-pinned concrete model ids)
+// pass through verbatim.
+//
 // Decisions are appended to the shared routing log in the same format the
 // skill uses, so `/smart-dispatch-report` reflects hook-routed activity too.
 //
@@ -15,6 +20,7 @@
 import { routeDispatch } from '../src/dispatch-pipeline.js'
 import { loadConfig } from '../src/config.js'
 import { appendLogEntry, readLogTail } from '../src/routing-log.js'
+import { wireName } from '../src/model-registry.js'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -77,13 +83,17 @@ async function main() {
   // inherits the session default, which is exactly what we want.
   if (!decision.rewrite || dryRun) return emitEmpty()
 
+  // Slot → wire name (light→haiku…); concrete ids have no wire name and are
+  // written exactly as configured.
+  const model = wireName(decision.rewrite) ?? decision.rewrite
+
   // updatedInput REPLACES tool_input — echo the full object, only model changed.
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'allow',
-        updatedInput: { ...toolInput, model: decision.rewrite },
+        updatedInput: { ...toolInput, model },
       },
     }),
   )

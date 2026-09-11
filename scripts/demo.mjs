@@ -12,7 +12,11 @@ import { decideModel } from '../src/decide-model.js'
 
 const useColor = process.stdout.isTTY
 const c = (code, s) => (useColor ? `\x1b[${code}m${s}\x1b[0m` : s)
-const model = (m) => ({ opus: '32', sonnet: '33', haiku: '36' }[m] ? c({ opus: '32;1', sonnet: '33', haiku: '36' }[m], m.padEnd(6)) : m)
+const model = (m) => {
+  // canonical slots + legacy aliases (explicit-model rows may carry either)
+  const colors = { heavy: '32;1', mid: '33', light: '36', opus: '32;1', sonnet: '33', haiku: '36' }
+  return colors[m] ? c(colors[m], m.padEnd(6)) : m
+}
 const dim = (s) => c('2;90', s)
 
 // (label is for display; prompt is what the classifier actually sees.)
@@ -81,6 +85,6 @@ for (const t of tasks) {
   console.log(`  ${label}  ${r.tier.padEnd(W.tier)}${r.conf.toString().padEnd(W.conf)}  ${model(r.model)}  ${r.note}`)
 }
 
-console.log(dim('\n  Hard tasks, uncertain prompts, and search-then-fix traps stay on opus.'))
+console.log(dim('\n  Hard tasks, uncertain prompts, and search-then-fix traps stay on heavy.'))
 console.log(dim('  Confident read-only/mechanical tasks downgrade — and a re-dispatched'))
 console.log(dim('  downgrade self-heals to the session default. Never lose quality.\n'))

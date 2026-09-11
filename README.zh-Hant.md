@@ -19,15 +19,17 @@
 派生 sub-agent 之前，smart-dispatch 會：
 
 1. 用一個**便宜的小模型**（Haiku）給任務分類 → `{tier, confidence}`。
-2. 套用**品質優先策略**：預設 `opus`；僅當 `tier ∈ {Trivial, Routine}` 且 `confidence ≥ 0.8` 時才降級。
-3. 用選定的模型派生執行 agent。
+2. 套用**品質優先策略**：預設 `heavy`；僅當 `tier ∈ {Trivial, Routine}` 且 `confidence ≥ 0.8` 時才降級。
+3. 按選定的檔位模型派生執行 agent。
 
-| Tier | 例子 | 模型 |
+| Tier | 例子 | 檔位 |
 |------|------|------|
-| Trivial 瑣碎 | grep、列檔案、讀設定 | haiku |
-| Routine 常規 | 清晰模式的編輯、總結、格式化 | sonnet |
-| Hard 困難 | 設計、除錯、新程式碼、架構 | opus |
-| 不確定 | 任何模糊的情況 | opus（兜底） |
+| Trivial 瑣碎 | grep、列檔案、讀設定 | light |
+| Routine 常規 | 清晰模式的編輯、總結、格式化 | mid |
+| Hard 困難 | 設計、除錯、新程式碼、架構 | heavy |
+| 不確定 | 任何模糊的情況 | heavy（兜底） |
+
+模型名是**跨宿主中立的檔位**——`light` / `mid` / `heavy`。每個宿主自行解析成自己的模型：Claude Code 上 `light→haiku`、`mid→sonnet`、`heavy→opus`；Codex 上由你的 `codex.models` 配置決定；Pi 上用你目前 provider 的產品線。v0.5.0 之前的名字（`haiku`/`sonnet`/`opus`）在配置和舊日誌裡仍是合法同義詞。
 
 路由器自己輸出的 `model` 欄位會被**忽略**——策略只根據 `tier` + `confidence` 重新決定。
 
@@ -59,13 +61,13 @@ claude plugin update smart-dispatch
   "downgradeThreshold": 0.8,
   "budgetFloor": 0.1,
   "escalation": { "enabled": true, "windowMinutes": 10 },
-  "agentOverrides": { "my-file-finder": "haiku", "my-careful-agent": "never" },
-  "priceTable": { "haiku": 0.1, "sonnet": 0.3, "opus": 1.0 }
+  "agentOverrides": { "my-file-finder": "light", "my-careful-agent": "never" },
+  "priceTable": { "light": 0.1, "mid": 0.3, "heavy": 1.0 }
 }
 ```
 
-- **`downgradeThreshold`**（預設 `0.8`，環境變數 `SMART_DISPATCH_THRESHOLD`）——離開 opus 所需的信心度。調高 = 更保守（更接近全 opus）；調低 = 更積極地降級。
-- **`budgetFloor`**（預設 `0.1`，環境變數 `SMART_DISPATCH_BUDGET_FLOOR`）——僅在預算模式（Workflow 專業模式 `workflows/batch-route.js`）下生效：當剩餘預算低於此比例時，opus 降為 sonnet。絕不會把已降級的任務再調上去。
+- **`downgradeThreshold`**（預設 `0.8`，環境變數 `SMART_DISPATCH_THRESHOLD`）——離開 heavy 所需的信心度。調高 = 更保守（更接近全 heavy）；調低 = 更積極地降級。
+- **`budgetFloor`**（預設 `0.1`，環境變數 `SMART_DISPATCH_BUDGET_FLOOR`）——僅在預算模式（Workflow 專業模式 `workflows/batch-route.js`）下生效：當剩餘預算低於此比例時，heavy 降為 mid。絕不會把已降級的任務再調上去。
 - **`escalation`**（一鍵關閉：`SMART_DISPATCH_ESCALATION=0`）——對被降級後又重新派發的任務做自癒的視窗。
 - **`agentOverrides`**——按 subagent 類型固定模型（原樣套用，等同使用者覆蓋），或 `"never"` 表示該類型完全不動。
 - **路由器模型**——預設 Haiku（在 `eval/run-eval.js` 設定）。若 eval 顯示有誤降級，升級到 Sonnet。
@@ -80,8 +82,8 @@ ANTHROPIC_API_KEY=xxx npm run eval   # 對 eval/dataset.json 跑真實路由品�
 
 eval 報告兩個數字：
 
-- **falseDowngradeRate**——Hard 任務被路由到 opus 以下的比率。**紅線：趨近 0。**
-- **savingsRate**——相對全 opus 基線的花費節省。目標 0.3–0.5。
+- **falseDowngradeRate**——Hard 任務被路由到 heavy 以下的比率。**紅線：趨近 0。**
+- **savingsRate**——相對全 heavy 基線的花費節省。目標 0.3–0.5。
 
 ## 它怎麼建構的
 
@@ -107,13 +109,13 @@ eval 報告兩個數字：
 
 ## 專業模式：批次路由（預算自適應）
 
-`workflows/batch-route.js` 是一個用於批次處理 + 成本控制的 [Workflow](https://docs.claude.com/claude-code/workflows)。它套用相同的品質優先策略，**並加上**預算感知：當剩餘預算低於 `budgetFloor` 時，`opus` 任務降為 `sonnet`（唯一允許的 opus 向下覆蓋）。把單一任務或任務陣列作為 `args` 傳入；它用 Haiku 給每個任務路由，再用選定的模型執行。
+`workflows/batch-route.js` 是一個用於批次處理 + 成本控制的 [Workflow](https://docs.claude.com/claude-code/workflows)。它套用相同的品質優先策略，**並加上**預算感知：當剩餘預算低於 `budgetFloor` 時，`heavy` 任務降為 `mid`（唯一允許的 heavy 向下覆蓋）。把單一任務或任務陣列作為 `args` 傳入；它用 Haiku 給每個任務路由，再按選定檔位的模型執行。
 
 > **注意：** workflow 腳本執行在沙箱裡，無法 `import` 本地模組，所以策略在腳本裡**內嵌**了一份（有同步守衛測試把關）。`src/decide-model.js` 仍是唯一真相源。執行它會按任務數派生 sub-agent（多 agent 編排），會消耗 token。
 
 ## 可觀測性
 
-每次路由決策都會在對話裡顯示一行（`smart-dispatch → haiku (Trivial, conf 0.92)`），並追加到本機日誌 `~/.smart-dispatch/log.jsonl`——**只記錄 `tier`、`confidence`、`model`、時間戳、subagent 類型、以及任務的單向 `hash`**，絕不記錄任務原文。`Retry` 條目記錄每次自癒的降級（`escalatedFrom`）：同一任務在升級視窗內被重新派發且此前被路由到 opus 以下時，hook 會放棄降級並記錄這次糾正——降錯一次的代價是多跑一跳便宜嘗試，而不是搞壞任務。
+每次路由決策都會在對話裡顯示一行（`smart-dispatch → light (Trivial, conf 0.92)`），並追加到本機日誌 `~/.smart-dispatch/log.jsonl`——**只記錄 `tier`、`confidence`、`model`、時間戳、subagent 類型、以及任務的單向 `hash`**，絕不記錄任務原文。`Retry` 條目記錄每次自癒的降級（`escalatedFrom`）：同一任務在升級視窗內被重新派發且此前被路由到 heavy 以下時，hook 會放棄降級並記錄這次糾正——降錯一次的代價是多跑一跳便宜嘗試，而不是搞壞任務。
 
 隨時查看聚合統計：
 
@@ -124,7 +126,7 @@ npm run report -- --since 7d      # 最近 7 天（也支援 24h 或 2026-08-01�
 npm run report -- --json          # 機器可讀格式
 ```
 
-它會報告：總決策數、模型/tier/agent 分佈、相對全 opus 的估算節省（標註所用的版本化價格表——估算會註明用的是哪套價格）、預算模式降級頻率、以及自癒重試次數。用 `SMART_DISPATCH_LOG` 覆蓋日誌路徑。
+它會報告：總決策數、模型/tier/agent 分佈、相對全 heavy 的估算節省（標註所用的版本化價格表——估算會註明用的是哪套價格）、預算模式降級頻率、以及自癒重試次數。v0.5.0 之前的日誌條目（haiku/sonnet/opus）會歸一化顯示。用 `SMART_DISPATCH_LOG` 覆蓋日誌路徑。
 
 ## 授權
 

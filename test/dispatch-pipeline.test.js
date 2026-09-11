@@ -26,11 +26,11 @@ test('explicit model = user override: decision passes through, nothing logged', 
 
 test('confident read-only downgrade: rewrite to the registry leader of the tier', () => {
   const { decision, logged } = run(CALL)
-  assert.equal(decision.model, 'haiku')
-  assert.equal(decision.rewrite, 'haiku')
+  assert.equal(decision.model, 'light')
+  assert.equal(decision.rewrite, 'light')
   assert.equal(decision.downgraded, true)
   assert.equal(logged.length, 1)
-  assert.equal(logged[0].model, 'haiku')
+  assert.equal(logged[0].model, 'light')
   assert.equal(logged[0].agent, 'Explore')
   assert.equal(logged[0].host, 'claude-code')
   assert.ok(logged[0].hash)
@@ -38,18 +38,19 @@ test('confident read-only downgrade: rewrite to the registry leader of the tier'
 
 test('hard/uncertain task: model resolves for the log, but no rewrite (inherit session default)', () => {
   const { decision, logged } = run({ subagentType: 'Explore', prompt: 'design a caching layer', description: '', host: 'pi' })
-  assert.equal(decision.model, 'opus')
+  assert.equal(decision.model, 'heavy')
   assert.equal(decision.rewrite, null)
   assert.equal(decision.downgraded, false)
-  assert.equal(logged[0].model, 'opus')
+  assert.equal(logged[0].model, 'heavy')
   assert.equal(logged[0].host, 'pi')
 })
 
-test('retry of a downgraded task: escalate — opus in the log, escalatedFrom set, no rewrite', () => {
+test('retry of a downgraded task: escalate — heavy in the log, escalatedFrom set, no rewrite', () => {
   const hash = hashPrompt({ prompt: CALL.prompt, description: CALL.description })
+  // Legacy-vocabulary entry: pre-v0.5.0 logs say haiku — must still match.
   const entries = [{ ts: '2026-09-11T11:55:00Z', model: 'haiku', hash }]
   const { decision, logged } = run(CALL, { entries })
-  assert.equal(decision.model, 'opus')
+  assert.equal(decision.model, 'heavy')
   assert.equal(decision.rewrite, null)
   assert.equal(decision.escalatedFrom, 'haiku')
   assert.equal(logged[0].tier, 'Retry')
@@ -60,18 +61,29 @@ test('escalation disabled via config: normal downgrade resumes', () => {
   const hash = hashPrompt({ prompt: CALL.prompt, description: CALL.description })
   const entries = [{ ts: '2026-09-11T11:55:00Z', model: 'haiku', hash }]
   const { decision } = run(CALL, { entries, config: { escalation: { enabled: false } } })
-  assert.equal(decision.rewrite, 'haiku')
+  assert.equal(decision.rewrite, 'light')
 })
 
-test('agentOverrides: fixed model wins over heuristics and is always rewritten', () => {
-  const config = { agentOverrides: { 'my-finder': 'haiku' } }
+test('agentOverrides: fixed slot wins over heuristics, canonicalized, always rewritten', () => {
+  const config = { agentOverrides: { 'my-finder': 'haiku' } } // legacy alias, un-normalized
   const { decision, logged } = run(
     { subagentType: 'my-finder', prompt: 'architect a distributed system', description: '', host: 'codex' },
     { config },
   )
-  assert.equal(decision.model, 'haiku')
-  assert.equal(decision.rewrite, 'haiku', 'a configured fixed model is written explicitly, even opus')
+  assert.equal(decision.model, 'light', 'legacy alias canonicalized for the log')
+  assert.equal(decision.rewrite, 'light', 'a configured fixed model is written explicitly, even heavy')
   assert.equal(logged[0].tier, 'Override')
+  assert.equal(logged[0].model, 'light')
+})
+
+test('agentOverrides: concrete model id passes through verbatim (outside the vocabulary)', () => {
+  const config = { agentOverrides: { 'my-finder': 'claude-opus-4-1' } }
+  const { decision } = run(
+    { subagentType: 'my-finder', prompt: 'architect a distributed system', description: '', host: 'claude-code' },
+    { config },
+  )
+  assert.equal(decision.model, 'claude-opus-4-1')
+  assert.equal(decision.rewrite, 'claude-opus-4-1')
 })
 
 test('agentOverrides: "never" skips routing entirely — no decision log', () => {
@@ -81,8 +93,8 @@ test('agentOverrides: "never" skips routing entirely — no decision log', () =>
   assert.equal(logged.length, 0)
 })
 
-test('threshold config flows through: higher threshold keeps the task on opus', () => {
+test('threshold config flows through: higher threshold keeps the task on heavy', () => {
   const { decision } = run(CALL, { config: { downgradeThreshold: 0.9 } })
   assert.equal(decision.rewrite, null)
-  assert.equal(decision.model, 'opus')
+  assert.equal(decision.model, 'heavy')
 })

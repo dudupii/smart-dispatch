@@ -45,7 +45,11 @@ function runHook({ tool_name = 'Agent', tool_input = {}, env = {}, stdin } = {})
   return out === '' ? {} : JSON.parse(out)
 }
 
-test('downgrades a short read-only Explore search to haiku via updatedInput', () => {
+// The pipeline speaks canonical slots (light/mid/heavy); the Claude Code
+// adapter translates to the host's wire names at the updatedInput boundary —
+// assertions on updatedInput therefore expect haiku/sonnet/opus, while log
+// assertions expect the canonical slots.
+test('downgrades a short read-only Explore search: slot light → wire haiku', () => {
   const r = runHook({
     tool_input: {
       subagent_type: 'Explore',
@@ -130,6 +134,7 @@ test('malformed stdin never breaks the call — emits {}', () => {
 })
 
 test('hook never escalates: only ever rewrites to haiku/sonnet, never back to opus', () => {
+  // Slot terms: only ever rewrites DOWN to light/mid, never up to heavy.
   // A non-downgrade must yield {} (so the call inherits the session default),
   // never an updatedInput that forces opus. This is the no-escalation invariant.
   const cases = [
@@ -156,7 +161,7 @@ test('every routed decision is appended to the shared log', () => {
     const entry = JSON.parse(lines[lines.length - 1])
     assert.ok(['ts', 'tier', 'confidence', 'model', 'host'].every((k) => k in entry))
     assert.equal(entry.host, 'claude-code')
-    assert.ok(['haiku', 'sonnet', 'opus'].includes(entry.model))
+    assert.ok(['light', 'mid', 'heavy'].includes(entry.model), 'log speaks canonical slots')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -188,7 +193,7 @@ test('agentOverrides: fixed model applied verbatim, logged as an Override', () =
     assert.equal(r.hookSpecificOutput.updatedInput.model, 'haiku')
     const entry = JSON.parse(readFileSync(log, 'utf8').trim().split('\n').pop())
     assert.equal(entry.tier, 'Override')
-    assert.equal(entry.model, 'haiku')
+    assert.equal(entry.model, 'light')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -224,7 +229,7 @@ test('dry-run: decision is logged but the call is never rewritten', () => {
     })
     assert.deepEqual(r, {}, 'dry-run must not rewrite the model')
     const entry = JSON.parse(readFileSync(log, 'utf8').trim().split('\n').pop())
-    assert.equal(entry.model, 'haiku', 'the would-be decision is still logged')
+    assert.equal(entry.model, 'light', 'the would-be decision is still logged')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -262,11 +267,11 @@ test('second dispatch of a downgraded task is not downgraded again (escalated)',
 
     const lines = readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     assert.equal(lines.length, 2)
-    assert.equal(lines[0].model, 'haiku')
+    assert.equal(lines[0].model, 'light')
     assert.ok(lines[0].hash, 'routed decisions log their prompt hash')
     assert.equal(lines[1].tier, 'Retry')
-    assert.equal(lines[1].model, 'opus')
-    assert.equal(lines[1].escalatedFrom, 'haiku')
+    assert.equal(lines[1].model, 'heavy')
+    assert.equal(lines[1].escalatedFrom, 'light')
     assert.equal(lines[1].hash, lines[0].hash)
     assert.equal(lines[1].agent, 'Explore')
   } finally {

@@ -53,14 +53,14 @@ test('workflow inlines the same DOWNGRADE_THRESHOLD / BUDGET_FLOOR as decide-mod
 
 test('workflow chooseModel agrees with decideModel on the quality-first vectors', () => {
   const vectors = [
-    ['Trivial', 0.9],   // confident trivial → haiku
-    ['Routine', 0.85],  // confident routine → sonnet
-    ['Hard', 0.99],     // hard → opus
-    ['Unknown', 0.9],   // uncertain → opus
-    ['Trivial', 0.7],   // not confident → opus
+    ['Trivial', 0.9],   // confident trivial → light
+    ['Routine', 0.85],  // confident routine → mid
+    ['Hard', 0.99],     // hard → heavy
+    ['Unknown', 0.9],   // uncertain → heavy
+    ['Trivial', 0.7],   // not confident → heavy
     ['Trivial', 0.8],   // exact boundary → downgrade
-    ['Trivial', NaN],   // garbage confidence → opus
-    [null, 0.9],        // missing tier → opus
+    ['Trivial', NaN],   // garbage confidence → heavy
+    [null, 0.9],        // missing tier → heavy
   ]
   for (const [tier, confidence] of vectors) {
     const expected = decideModel({ tier, confidence }).model
